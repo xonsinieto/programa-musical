@@ -535,11 +535,68 @@ main {
 }
 
 @media (max-width: 600px) {
+  header {
+    padding: 10px 12px;
+  }
+  header h1 {
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+  }
+  nav.tabs .tab {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+  }
+  main {
+    padding: 0 10px;
+    margin: 12px auto;
+  }
+  .controls {
+    gap: 8px 12px;
+    font-size: 0.9rem;
+  }
+  .controls select,
+  .controls button,
+  .controls input {
+    font-size: 0.9rem;
+    padding: 6px 10px;
+  }
   .answer-buttons {
     grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
   }
   .note-btn {
-    padding: 16px 0;
-    font-size: 1.1rem;
+    padding: 14px 0;
+    font-size: 1rem;
+  }
+  .stats {
+    font-size: 0.85rem;
+    padding: 10px;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  #staff-container,
+  #fc-staff-container,
+  #sp-game-container {
+    min-height: 340px;
+  }
+  #staff-container {
+    width: 100vw;
+  }
+  .sp-ov-panel {
+    padding: 18px 20px;
+  }
+  .sp-ov-panel h2 {
+    font-size: 1.4rem;
+  }
+  .big-start {
+    font-size: 1.2rem;
+    padding: 14px 32px;
+  }
+  #modal-note-name {
+    font-size: 1.8rem;
+  }
+  .hints {
+    padding: 14px;
+    font-size: 0.9rem;
   }
 }
