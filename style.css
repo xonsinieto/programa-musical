@@ -647,7 +647,9 @@ main {
   }
   #ref-staff-container {
     padding: 5px 0 !important;
+    height: 380px !important;
     min-height: 0 !important;
+    max-height: 380px !important;
     overflow: hidden !important;
   }
   .modal-content {
