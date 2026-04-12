@@ -577,10 +577,46 @@ main {
   #staff-container,
   #fc-staff-container,
   #sp-game-container {
-    min-height: 340px;
+    min-height: 320px;
+    height: 320px;
+    overflow: hidden;
+    padding: 0;
   }
   #staff-container {
     width: 100vw;
+  }
+  #staff-container svg,
+  #fc-staff-container svg {
+    transform: scale(0.65);
+    transform-origin: top center;
+  }
+  #sp-game-container svg {
+    transform: scale(0.65);
+    transform-origin: top left;
+  }
+  #sp-retry-bar {
+    font-size: 0.95rem;
+    padding: 10px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  #sp-retry-bar strong {
+    font-size: 1.1rem;
+  }
+  #ref-staff-container {
+    padding: 20px 0;
+  }
+  #ref-staff-container svg {
+    transform: scale(0.85);
+    transform-origin: top center;
+  }
+  .modal-content {
+    min-width: 0;
+    padding: 10px;
+  }
+  #modal-staff svg {
+    transform: scale(0.75);
+    transform-origin: top center;
   }
   .sp-ov-panel {
     padding: 18px 20px;
