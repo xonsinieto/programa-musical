@@ -97,7 +97,9 @@
   function render() {
     staffContainer.innerHTML = "";
 
-    const containerWidth = Math.max(400, staffContainer.clientWidth);
+    const isMobile       = window.innerWidth < 600;
+    const mult           = isMobile ? 1.82 : 1;
+    const containerWidth = Math.max(400, staffContainer.clientWidth) * mult;
     const height         = 460;
     const staveX         = 20;
     const staveWidth     = containerWidth - staveX - 20;
@@ -690,7 +692,9 @@
     const sel = refClefSelect.value;
     const clefs = sel === "both" ? ["treble", "bass"] : [sel];
 
-    const containerWidth = Math.max(400, refStaffContainer.clientWidth);
+    const isMobile = window.innerWidth < 600;
+    const mult     = isMobile ? 1.82 : 1;
+    const containerWidth = Math.max(400, refStaffContainer.clientWidth) * mult;
     const sideMargin = 20;
     const staveWidth = containerWidth - sideMargin * 2;
     const topPad      = 150;
@@ -713,7 +717,9 @@
   function renderSingleOnGrandStaff(container, activeClef, noteKey, highlightColor) {
     container.innerHTML = "";
 
-    const containerWidth = Math.max(400, container.clientWidth);
+    const isMobile       = window.innerWidth < 600;
+    const mult           = isMobile ? 1.82 : 1;
+    const containerWidth = Math.max(400, container.clientWidth) * mult;
     const height         = 460;
     const staveX         = 20;
     const staveWidth     = containerWidth - staveX - 20;
@@ -932,8 +938,10 @@
     const oldSvgs = spContainer.querySelectorAll("svg");
     oldSvgs.forEach(s => s.remove());
 
-    const width  = Math.max(600, spContainer.clientWidth);
-    const height = 460;
+    const isMobile = window.innerWidth < 600;
+    const mult     = isMobile ? 1.82 : 1;
+    const width    = Math.max(600, spContainer.clientWidth) * mult;
+    const height   = 460;
     spSpawnX   = width - 30;
     spHitLineX = 120;
 

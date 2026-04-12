@@ -602,11 +602,12 @@ main {
     width: 100vw;
   }
   #staff-container svg,
-  #fc-staff-container svg {
-    transform: scale(0.55);
-    transform-origin: top center;
-  }
+  #fc-staff-container svg,
   #sp-game-container svg {
+    transform: scale(0.55);
+    transform-origin: top left;
+  }
+  #ref-staff-container svg {
     transform: scale(0.55);
     transform-origin: top left;
   }
@@ -621,13 +622,8 @@ main {
   }
   #ref-staff-container {
     padding: 5px 0 !important;
-    height: 380px !important;
     min-height: 0 !important;
     overflow: hidden !important;
-  }
-  #ref-staff-container svg {
-    transform: scale(0.55);
-    transform-origin: top center;
   }
   .modal-content {
     min-width: 0;
