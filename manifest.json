@@ -1,0 +1,20 @@
+{
+  "name": "Entrenador de Lectura de Notes",
+  "short_name": "Lectura Notes",
+  "description": "App per aprendre a llegir notes musicals amb entrenament, velocitat, referència i flashcards.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f6fa",
+  "theme_color": "#2c3e50",
+  "lang": "ca",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

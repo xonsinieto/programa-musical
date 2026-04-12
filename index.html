@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Entrenador de Lectura de Notes</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <meta name="theme-color" content="#2c3e50" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Lectura Notes" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.3/build/cjs/vexflow.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Entrenador de Lectura de Notes</h1>
+    <nav class="tabs">
+      <button class="tab active" data-screen="reference">Referència</button>
+      <button class="tab" data-screen="train">Entrenament</button>
+      <button class="tab" data-screen="speed">Velocitat</button>
+      <button class="tab" data-screen="flashcards">Flashcards</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ENTRENAMENT -->
+    <section id="screen-train" class="screen">
+      <div class="controls">
+        <label>
+          Clau:
+          <select id="clef-select">
+            <option value="treble">Sol</option>
+            <option value="bass">Fa</option>
+            <option value="both">Les dues (aleatori)</option>
+          </select>
+        </label>
+        <label>
+          Nivell:
+          <select id="level-select">
+            <option value="1" selected>1 - Bàsic</option>
+            <option value="2">2 - Intermedi</option>
+            <option value="3">3 - Avançat</option>
+          </select>
+        </label>
+        <label>
+          Mode:
+          <select id="mode-select">
+            <option value="single">Una nota</option>
+            <option value="sequence" selected>Seqüència</option>
+          </select>
+        </label>
+        <label>
+          Notes:
+          <select id="count-select">
+            <option value="8">8</option>
+            <option value="16" selected>16</option>
+            <option value="24">24</option>
+          </select>
+        </label>
+        <button id="new-note-btn">Nova</button>
+      </div>
+
+      <div id="staff-container"></div>
+
+      <div id="feedback" class="feedback"></div>
+
+      <div class="answer-buttons">
+        <button class="note-btn" data-note="do">Do</button>
+        <button class="note-btn" data-note="re">Re</button>
+        <button class="note-btn" data-note="mi">Mi</button>
+        <button class="note-btn" data-note="fa">Fa</button>
+        <button class="note-btn" data-note="sol">Sol</button>
+        <button class="note-btn" data-note="la">La</button>
+        <button class="note-btn" data-note="si">Si</button>
+      </div>
+
+      <div class="stats">
+        <span>Encerts: <strong id="correct-count">0</strong></span>
+        <span>Errors: <strong id="wrong-count">0</strong></span>
+        <span>Precisió: <strong id="accuracy">—</strong></span>
+      </div>
+    </section>
+
+    <!-- REFERÈNCIA -->
+    <section id="screen-reference" class="screen active">
+      <div class="controls">
+        <label>
+          Clau:
+          <select id="ref-clef-select">
+            <option value="treble">Sol</option>
+            <option value="bass">Fa</option>
+            <option value="both" selected>Les dues</option>
+          </select>
+        </label>
+      </div>
+      <div id="ref-staff-container"></div>
+      <div class="hints">
+        <h3>Trucs de memorització</h3>
+        <div class="hint-block">
+          <h4>Clau de Sol</h4>
+          <p><strong>Línies</strong> (de baix a dalt): <em>Mi – Sol – Si – Re – Fa</em></p>
+          <p><strong>Espais</strong> (de baix a dalt): <em>Fa – La – Do – Mi</em></p>
+        </div>
+        <div class="hint-block">
+          <h4>Clau de Fa</h4>
+          <p><strong>Línies</strong> (de baix a dalt): <em>Sol – Si – Re – Fa – La</em></p>
+          <p><strong>Espais</strong> (de baix a dalt): <em>La – Do – Mi – Sol</em></p>
+        </div>
+        <div class="hint-block">
+          <h4>Punt de referència</h4>
+          <p>El <strong>Do central</strong> (Do 4) és una línia addicional just entre els dos pentagrames.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- FLASHCARDS -->
+    <section id="screen-flashcards" class="screen">
+      <div class="controls">
+        <label>
+          Clau:
+          <select id="fc-clef-select">
+            <option value="treble">Sol</option>
+            <option value="bass">Fa</option>
+            <option value="both" selected>Les dues (aleatori)</option>
+          </select>
+        </label>
+        <label>
+          Nivell:
+          <select id="fc-level-select">
+            <option value="1" selected>1 - Bàsic</option>
+            <option value="2">2 - Intermedi</option>
+            <option value="3">3 - Avançat</option>
+          </select>
+        </label>
+        <button id="fc-reset-btn">Reiniciar</button>
+      </div>
+
+      <div id="fc-staff-container"></div>
+
+      <div id="fc-answer" class="fc-answer"></div>
+
+      <div class="fc-buttons">
+        <button id="fc-reveal-btn" class="big-btn reveal">Mostra resposta</button>
+        <button id="fc-knew-btn"   class="big-btn knew"   disabled>La sabia</button>
+        <button id="fc-didnt-btn"  class="big-btn didnt"  disabled>No la sabia</button>
+      </div>
+
+      <div class="stats">
+        <span>Vistes: <strong id="fc-seen">0</strong></span>
+        <span>Sabudes: <strong id="fc-knew">0</strong></span>
+        <span>Encert: <strong id="fc-rate">—</strong></span>
+      </div>
+    </section>
+
+    <!-- VELOCITAT -->
+    <section id="screen-speed" class="screen">
+      <div class="controls">
+        <label>
+          Clau:
+          <select id="sp-clef-select">
+            <option value="treble">Sol</option>
+            <option value="bass">Fa</option>
+            <option value="both" selected>Les dues (aleatori)</option>
+          </select>
+        </label>
+        <label>
+          Nivell:
+          <select id="sp-level-select">
+            <option value="1" selected>1 - Bàsic</option>
+            <option value="2">2 - Intermedi</option>
+            <option value="3">3 - Avançat</option>
+          </select>
+        </label>
+        <label>
+          Velocitat:
+          <select id="sp-speed-select">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+          </select>
+        </label>
+        <button id="sp-reset-btn">Reiniciar</button>
+      </div>
+
+      <div id="sp-game-container">
+        <div id="sp-overlay">
+          <div id="sp-ov-start" class="sp-ov-panel">
+            <h2>Mode Velocitat</h2>
+            <p>Acerta 10 notes seguides per pujar de velocitat.<br>Comences a la velocitat 1 i pots arribar fins a la 10.</p>
+            <button id="sp-start-btn" class="big-start">Començar</button>
+          </div>
+          <div id="sp-ov-levelup" class="sp-ov-panel hidden">
+            <h2 id="sp-lvlup-title">Velocitat 1 superada!</h2>
+            <p id="sp-lvlup-sub">Avances a la velocitat 2</p>
+          </div>
+          <div id="sp-ov-win" class="sp-ov-panel hidden">
+            <h2>Felicitats!</h2>
+            <p>Has superat totes les velocitats.</p>
+            <button id="sp-restart-btn" class="big-start">Jugar de nou</button>
+          </div>
+        </div>
+        <div id="sp-retry-bar" class="hidden">
+          <span>Has fallat — era <strong id="sp-fail-name"></strong></span>
+          <button id="sp-retry-btn" class="big-start sp-retry-small">Torna-ho a provar</button>
+        </div>
+      </div>
+
+      <div id="sp-feedback" class="feedback"></div>
+
+      <div class="answer-buttons">
+        <button class="note-btn sp-note-btn" data-note="do">Do</button>
+        <button class="note-btn sp-note-btn" data-note="re">Re</button>
+        <button class="note-btn sp-note-btn" data-note="mi">Mi</button>
+        <button class="note-btn sp-note-btn" data-note="fa">Fa</button>
+        <button class="note-btn sp-note-btn" data-note="sol">Sol</button>
+        <button class="note-btn sp-note-btn" data-note="la">La</button>
+        <button class="note-btn sp-note-btn" data-note="si">Si</button>
+      </div>
+
+      <div class="stats">
+        <span>Velocitat: <strong id="sp-speed-level">1</strong>/10</span>
+        <span>Ratxa: <strong id="sp-streak">0</strong>/10</span>
+        <span>Encerts: <strong id="sp-correct">0</strong></span>
+        <span>Errors: <strong id="sp-wrong">0</strong></span>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL VISTA NOTA INDIVIDUAL -->
+  <div id="note-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <button class="modal-close" id="modal-close-btn" aria-label="Tancar">×</button>
+      <div id="modal-note-name"></div>
+      <div id="modal-staff"></div>
+      <div id="modal-piano"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

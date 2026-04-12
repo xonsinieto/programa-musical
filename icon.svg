@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#2c3e50" rx="80"/>
+  <g transform="translate(256 256)">
+    <g stroke="#ffffff" stroke-width="10" fill="none">
+      <line x1="-170" y1="-70" x2="170" y2="-70"/>
+      <line x1="-170" y1="-35" x2="170" y2="-35"/>
+      <line x1="-170" y1="0"   x2="170" y2="0"/>
+      <line x1="-170" y1="35"  x2="170" y2="35"/>
+      <line x1="-170" y1="70"  x2="170" y2="70"/>
+    </g>
+    <g fill="#3498db" stroke="none">
+      <ellipse cx="10" cy="35" rx="32" ry="24" transform="rotate(-18 10 35)"/>
+      <rect x="38" y="-90" width="7" height="130" rx="2"/>
+      <path d="M 45 -90 C 100 -80, 120 -40, 90 -20 C 120 -45, 95 -70, 45 -60 Z" fill="#3498db"/>
+    </g>
+  </g>
+</svg>
