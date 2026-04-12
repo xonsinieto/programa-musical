@@ -295,6 +295,7 @@
     const notes     = clef === "bass" ? [...RANGES[clef]].reverse() : RANGES[clef];
     const clefSpace = 70;
     const rightPad  = 40;
+    const noteSpace = Math.max(14, (staveWidth - clefSpace - rightPad) / notes.length);
 
     const stave = new VF.Stave(xOffset, yOffset, staveWidth);
     stave.addClef(clef).setContext(context).draw();
