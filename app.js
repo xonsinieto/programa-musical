@@ -344,17 +344,24 @@
       text.textContent = label;
       svg.appendChild(text);
 
-      // Zona clicable
+      // Zona clicable: rectangle ampli centrat a la nota, tallat pel noteSpace
       const rect = document.createElementNS(SVG_NS, "rect");
-      rect.setAttribute("x", x - 6);
-      rect.setAttribute("y", y - 18);
-      rect.setAttribute("width", w + 12);
-      rect.setAttribute("height", h + 32);
-      rect.setAttribute("fill", "transparent");
+      const rw = Math.max(noteSpace, 20);
+      rect.setAttribute("x", cx - rw / 2);
+      rect.setAttribute("y", y - 24);
+      rect.setAttribute("width", rw);
+      rect.setAttribute("height", h + 48);
+      rect.setAttribute("fill", "rgba(0,0,0,0.001)");
       rect.setAttribute("stroke", "none");
       rect.style.pointerEvents = "all";
       rect.style.cursor = "pointer";
-      rect.addEventListener("click", () => openNoteModal(clef, notes[i]));
+      const handler = (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        openNoteModal(clef, notes[i]);
+      };
+      rect.addEventListener("click", handler);
+      rect.addEventListener("touchend", handler);
       svg.appendChild(rect);
     });
 
