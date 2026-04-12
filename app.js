@@ -301,16 +301,8 @@
     const stave = new VF.Stave(xOffset, yOffset, staveWidth);
     stave.addClef(clef).setContext(context).draw();
 
-    const staveNotes = notes.map((n) => {
-      const sn = new VF.StaveNote({ clef, keys: [n], duration: "w" });
-      const label = NOTE_NAMES_CA[noteLetter(n)].toUpperCase();
-      const ann = new VF.Annotation(label)
-        .setFont("Arial", 12, "bold")
-        .setVerticalJustification(VF.Annotation.VerticalJustify.TOP);
-      ann.setStyle({ fillStyle: "#3498db", strokeStyle: "#3498db" });
-      sn.addModifier(ann, 0);
-      return sn;
-    });
+    // Notes SENSE annotation (perquè el Formatter no les separi per longitud del text)
+    const staveNotes = notes.map((n) => new VF.StaveNote({ clef, keys: [n], duration: "w" }));
 
     const voice = new VF.Voice({ num_beats: notes.length, beat_value: 1 })
       .setMode(VF.Voice.Mode.SOFT)
@@ -322,8 +314,10 @@
 
     voice.draw(context, stave);
 
-    // Zones clicables invisibles a sobre de cada nota
     const svg = context.svg;
+    const SVG_NS = "http://www.w3.org/2000/svg";
+
+    // Etiquetes de text i zones clicables, usant la posició real de cada nota
     staveNotes.forEach((sn, i) => {
       let bb = null;
       try { bb = sn.getBoundingBox(); } catch (e) { bb = null; }
@@ -332,11 +326,28 @@
       const y = typeof bb.getY === "function" ? bb.getY() : bb.y;
       const w = typeof bb.getW === "function" ? bb.getW() : bb.w;
       const h = typeof bb.getH === "function" ? bb.getH() : bb.h;
-      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      const cx = x + w / 2;
+
+      // Etiqueta DO/RE/MI... centrada a sobre de la nota, mida que cap a noteSpace
+      const label = NOTE_NAMES_CA[noteLetter(notes[i])].toUpperCase();
+      const fontSize = Math.min(12, Math.max(7, noteSpace * 0.25));
+      const text = document.createElementNS(SVG_NS, "text");
+      text.setAttribute("x", cx);
+      text.setAttribute("y", y - 4);
+      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("font-family", "Arial, sans-serif");
+      text.setAttribute("font-size", fontSize);
+      text.setAttribute("font-weight", "bold");
+      text.setAttribute("fill", "#3498db");
+      text.textContent = label;
+      svg.appendChild(text);
+
+      // Zona clicable
+      const rect = document.createElementNS(SVG_NS, "rect");
       rect.setAttribute("x", x - 6);
-      rect.setAttribute("y", y - 14);
+      rect.setAttribute("y", y - 18);
       rect.setAttribute("width", w + 12);
-      rect.setAttribute("height", h + 28);
+      rect.setAttribute("height", h + 32);
       rect.setAttribute("fill", "transparent");
       rect.setAttribute("stroke", "none");
       rect.style.pointerEvents = "all";
