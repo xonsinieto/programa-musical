@@ -332,9 +332,7 @@
       // En mòbil, l'SVG s'escala 0.55 via CSS, així que pugem la mida intrínseca.
       const label = NOTE_NAMES_CA[noteLetter(notes[i])].toUpperCase();
       const isMobileLbl = window.innerWidth < 600;
-      const fontSize = isMobileLbl
-        ? Math.min(22, Math.max(16, noteSpace * 0.55))
-        : Math.min(12, Math.max(8, noteSpace * 0.3));
+      const fontSize = isMobileLbl ? 24 : Math.min(12, Math.max(8, noteSpace * 0.3));
       const text = document.createElementNS(SVG_NS, "text");
       text.setAttribute("x", cx);
       text.setAttribute("y", y - 4);
