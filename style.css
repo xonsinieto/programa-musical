@@ -536,37 +536,51 @@ main {
 
 @media (max-width: 600px) {
   header {
-    padding: 10px 12px;
+    padding: 6px 4px;
   }
   header h1 {
-    font-size: 1.1rem;
-    margin-bottom: 8px;
+    font-size: 1rem;
+    margin-bottom: 4px;
+  }
+  nav.tabs {
+    gap: 3px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 0 2px;
   }
   nav.tabs .tab {
-    padding: 8px 10px;
-    font-size: 0.85rem;
+    padding: 6px 8px;
+    font-size: 0.75rem;
+    flex: 1 1 auto;
+    white-space: nowrap;
   }
   main {
-    padding: 0 10px;
-    margin: 12px auto;
+    padding: 0 4px;
+    margin: 6px auto;
   }
   .controls {
-    gap: 8px 12px;
-    font-size: 0.9rem;
+    gap: 4px 8px;
+    font-size: 0.8rem;
+    margin-bottom: 6px;
+  }
+  .controls label {
+    gap: 4px;
   }
   .controls select,
   .controls button,
   .controls input {
-    font-size: 0.9rem;
-    padding: 6px 10px;
+    font-size: 0.8rem;
+    padding: 4px 6px;
   }
   .answer-buttons {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
   }
   .note-btn {
-    padding: 14px 0;
-    font-size: 1rem;
+    padding: 10px 0;
+    font-size: 0.85rem;
+    border-width: 1.5px;
+    border-radius: 7px;
   }
   .stats {
     font-size: 0.85rem;
