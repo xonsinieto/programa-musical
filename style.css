@@ -616,25 +616,19 @@ main {
   #staff-container,
   #fc-staff-container,
   #sp-game-container {
-    min-height: 260px !important;
-    height: 260px !important;
-    max-height: 260px;
-    overflow: hidden;
-    padding: 0;
+    min-height: 480px;
+    padding: 10px 0;
     margin-bottom: 8px;
   }
   #staff-container {
     width: 100vw;
+    overflow-x: auto;
   }
-  #staff-container svg,
-  #fc-staff-container svg,
-  #sp-game-container svg {
-    transform: scale(0.55);
-    transform-origin: top left;
-  }
-  #ref-staff-container svg {
-    transform: scale(0.55);
-    transform-origin: top left;
+  #ref-staff-container {
+    padding: 10px 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    min-height: 0 !important;
   }
   #sp-retry-bar {
     font-size: 0.9rem;
@@ -645,25 +639,13 @@ main {
   #sp-retry-bar strong {
     font-size: 1rem;
   }
-  #ref-staff-container {
-    padding: 5px 0 !important;
-    height: 380px !important;
-    min-height: 0 !important;
-    max-height: 380px !important;
-    overflow: hidden !important;
-  }
   .modal-content {
     min-width: 0;
     padding: 10px;
   }
   #modal-staff {
     width: 100% !important;
-    max-height: 280px;
-    overflow: hidden;
-  }
-  #modal-staff svg {
-    transform: scale(0.55);
-    transform-origin: top center;
+    overflow-x: auto;
   }
   #modal-piano {
     margin-top: 4px;

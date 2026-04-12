@@ -97,9 +97,7 @@
   function render() {
     staffContainer.innerHTML = "";
 
-    const isMobile       = window.innerWidth < 600;
-    const mult           = isMobile ? 1.82 : 1;
-    const containerWidth = Math.max(400, staffContainer.clientWidth) * mult;
+    const containerWidth = Math.max(400, staffContainer.clientWidth);
     const height         = 460;
     const staveX         = 20;
     const staveWidth     = containerWidth - staveX - 20;
@@ -331,8 +329,7 @@
       // Etiqueta DO/RE/MI... centrada a sobre de la nota.
       // En mòbil, l'SVG s'escala 0.55 via CSS, així que pugem la mida intrínseca.
       const label = NOTE_NAMES_CA[noteLetter(notes[i])].toUpperCase();
-      const isMobileLbl = window.innerWidth < 600;
-      const fontSize = isMobileLbl ? 24 : Math.min(12, Math.max(8, noteSpace * 0.3));
+      const fontSize = Math.min(13, Math.max(9, noteSpace * 0.3));
       const text = document.createElementNS(SVG_NS, "text");
       text.setAttribute("x", cx);
       text.setAttribute("y", y - 4);
@@ -713,8 +710,10 @@
     const clefs = sel === "both" ? ["treble", "bass"] : [sel];
 
     const isMobile = window.innerWidth < 600;
-    const mult     = isMobile ? 1.82 : 1;
-    const containerWidth = Math.max(400, refStaffContainer.clientWidth) * mult;
+    // En mòbil rendrem més ample per llegibilitat i activem scroll horitzontal al contenidor
+    const containerWidth = isMobile
+      ? Math.max(900, refStaffContainer.clientWidth)
+      : Math.max(400, refStaffContainer.clientWidth);
     const sideMargin = 20;
     const staveWidth = containerWidth - sideMargin * 2;
     const topPad      = 150;
@@ -737,9 +736,7 @@
   function renderSingleOnGrandStaff(container, activeClef, noteKey, highlightColor) {
     container.innerHTML = "";
 
-    const isMobile       = window.innerWidth < 600;
-    const mult           = isMobile ? 1.82 : 1;
-    const containerWidth = Math.max(400, container.clientWidth) * mult;
+    const containerWidth = Math.max(400, container.clientWidth);
     const height         = 460;
     const staveX         = 20;
     const staveWidth     = containerWidth - staveX - 20;
@@ -958,9 +955,7 @@
     const oldSvgs = spContainer.querySelectorAll("svg");
     oldSvgs.forEach(s => s.remove());
 
-    const isMobile = window.innerWidth < 600;
-    const mult     = isMobile ? 1.82 : 1;
-    const width    = Math.max(600, spContainer.clientWidth) * mult;
+    const width    = Math.max(600, spContainer.clientWidth);
     const height   = 460;
     spSpawnX   = width - 30;
     spHitLineX = 120;
