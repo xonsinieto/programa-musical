@@ -24,6 +24,15 @@ header h1 {
   font-size: 1.4rem;
 }
 
+header h1 .author {
+  font-size: 0.7rem;
+  font-weight: 400;
+  opacity: 0.75;
+  margin-left: 8px;
+  font-style: italic;
+  letter-spacing: 0.3px;
+}
+
 .controls {
   display: flex;
   justify-content: center;
@@ -336,19 +345,29 @@ nav.tabs .tab.active {
   .controls {
     margin-bottom: 6px;
   }
+  #staff-container,
+  #fc-staff-container,
   #sp-game-container {
     min-height: 300px !important;
     height: 300px !important;
     overflow: hidden;
     padding: 0;
   }
+  #staff-container svg,
+  #fc-staff-container svg,
   #sp-game-container svg {
     transform: scale(0.65);
     transform-origin: top left;
   }
-  #staff-container,
-  #fc-staff-container {
-    min-height: 320px;
+  #ref-staff-container {
+    height: 300px !important;
+    max-height: 300px !important;
+    overflow: hidden !important;
+    padding: 5px 0 !important;
+  }
+  #ref-staff-container svg {
+    transform: scale(0.58);
+    transform-origin: top left;
   }
 }
 
@@ -650,15 +669,7 @@ main {
     flex-wrap: wrap;
   }
   #staff-container,
-  #fc-staff-container {
-    min-height: 480px;
-    padding: 10px 0;
-    margin-bottom: 8px;
-  }
-  #staff-container {
-    width: 100vw;
-    overflow-x: auto;
-  }
+  #fc-staff-container,
   #sp-game-container {
     min-height: 280px;
     height: 280px;
@@ -666,7 +677,27 @@ main {
     margin-bottom: 8px;
     overflow: hidden;
   }
+  #staff-container {
+    width: 100vw;
+  }
+  #staff-container svg,
+  #fc-staff-container svg,
   #sp-game-container svg {
+    transform: scale(0.58);
+    transform-origin: top left;
+  }
+  /* Referència: es rendereitza amb amplada mínima de 900px (moltes notes).
+     Scale 0.58 redueix l'alçada. Permetem scroll horitzontal per veure totes
+     les notes del rang, i fixem alçada per compactar l'espai vertical. */
+  #ref-staff-container {
+    padding: 5px 0 !important;
+    height: 400px !important;
+    max-height: 400px !important;
+    min-height: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+  #ref-staff-container svg {
     transform: scale(0.58);
     transform-origin: top left;
   }
