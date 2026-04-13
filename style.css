@@ -722,7 +722,13 @@ main {
   }
   #modal-staff {
     width: 100% !important;
-    overflow-x: auto;
+    height: 280px !important;
+    max-height: 280px;
+    overflow: hidden;
+  }
+  #modal-staff svg {
+    transform: scale(0.58);
+    transform-origin: top center;
   }
   #modal-piano {
     margin-top: 4px;
