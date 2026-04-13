@@ -1981,9 +1981,16 @@
     spEnterPlay();
   }
 
-  function spRetry() {
+  function spResetRunStats() {
+    spCorrect = 0;
+    spWrong = 0;
     spStreak = 0;
+    spMaxSpeedThisRun = spCurrentSpeed;
     spUpdateStats();
+  }
+
+  function spRetry() {
+    spResetRunStats();
     spEnterPlay();
   }
 
@@ -1999,8 +2006,12 @@
     spShowOverlay(spOvStart);
   }
 
-  spClefSelect.addEventListener("change", spUpdateStats);
-  spLevelSelect.addEventListener("change", spUpdateStats);
+  spClefSelect.addEventListener("change", () => {
+    spResetRunStats();
+  });
+  spLevelSelect.addEventListener("change", () => {
+    spResetRunStats();
+  });
 
   spStartBtn.addEventListener("click", spStart);
   spRetryBtn.addEventListener("click", spRetry);
@@ -2029,8 +2040,7 @@
     const v = parseInt(spSpeedSelect.value, 10);
     if (!isNaN(v) && v >= 1 && v <= SP_MAX_SPEED) {
       spCurrentSpeed = v;
-      spStreak = 0;
-      spUpdateStats();
+      spResetRunStats();
     }
   });
   spNoteButtons.forEach(btn => {
