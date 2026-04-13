@@ -459,6 +459,7 @@
   let micBuffer   = null;
   let micLastMatchAt = 0;
   let micHistory     = []; // últimes N deteccions de nota
+  let micSilenceFramesSinceMatch = 999; // frames de silenci comptats des de l'últim match
 
   const NOTE_CLASS_BY_SEMITONE = {
     0: "do",  2: "re",  4: "mi",  5: "fa",  7: "sol", 9: "la", 11: "si"
@@ -517,13 +518,12 @@
       lowPass.Q.value = 0.7;
 
       micAnalyser = micCtx.createAnalyser();
-      micAnalyser.fftSize = 4096; // més resolució per pitches greus
+      micAnalyser.fftSize = 2048;
       source.connect(highPass);
       highPass.connect(lowPass);
       lowPass.connect(micAnalyser);
 
-      const mod = await import("https://esm.sh/pitchy@4");
-      micDetector = mod.PitchDetector.forFloat32Array(micAnalyser.fftSize);
+      micDetector = autoCorrelatePitch; // detector inline
       micBuffer = new Float32Array(micAnalyser.fftSize);
     } catch (e) {
       alert("Error inicialitzant la detecció de veu: " + e.message);
@@ -534,6 +534,7 @@
     micActive = true;
     micHistory = [];
     micLastMatchAt = 0;
+    micSilenceFramesSinceMatch = 999; // accepta primera nota sense esperar silenci
     micBtn.classList.add("active");
     micBtn.textContent = "🔴 Escoltant...";
     micLoop();
@@ -554,49 +555,58 @@
     if (!micActive || !micAnalyser || !micDetector) return;
     micAnalyser.getFloatTimeDomainData(micBuffer);
 
-    // Calcula RMS per detectar si hi ha veu (volum mínim)
     let sumSq = 0;
     for (let i = 0; i < micBuffer.length; i++) sumSq += micBuffer[i] * micBuffer[i];
     const rms = Math.sqrt(sumSq / micBuffer.length);
 
-    const [freq, clarity] = micDetector.findPitch(micBuffer, micCtx.sampleRate);
+    const MIN_RMS_DETECT  = 0.06;  // volum clarament audible (abans 0.015, massa sensible)
+    const MIN_RMS_SILENCE = 0.03;  // per sota → silenci (histèresi)
+    const MIN_CLARITY     = 0.92;
+    const SILENCE_FRAMES_REQUIRED = 15; // ~250ms de silenci abans d'acceptar nova nota
 
-    const MIN_RMS = 0.015;
-    const MIN_CLARITY = 0.9;
+    const isSilent = rms < MIN_RMS_SILENCE;
+    if (isSilent) micSilenceFramesSinceMatch++;
 
-    if (rms > MIN_RMS && clarity > MIN_CLARITY && freq > 70 && freq < 1200) {
-      const noteCa = freqToNoteCa(freq);
-      micStatus.textContent = (noteCa ? noteCa.toUpperCase() : "?") +
-                              "  " + Math.round(freq) + " Hz  c:" + clarity.toFixed(2);
-      if (noteCa) micStatus.classList.add("detected");
-      else micStatus.classList.remove("detected");
+    if (rms > MIN_RMS_DETECT) {
+      const [freq, clarity] = micDetector.findPitch(micBuffer, micCtx.sampleRate);
+      if (clarity > MIN_CLARITY && freq > 70 && freq < 1200) {
+        const noteCa = freqToNoteCa(freq);
+        micStatus.textContent = (noteCa ? noteCa.toUpperCase() : "?") +
+                                "  " + Math.round(freq) + " Hz  rms:" + rms.toFixed(2);
+        if (noteCa) micStatus.classList.add("detected");
+        else micStatus.classList.remove("detected");
 
-      if (noteCa) {
-        micHistory.push(noteCa);
-        if (micHistory.length > 6) micHistory.shift();
+        if (noteCa) {
+          micHistory.push(noteCa);
+          if (micHistory.length > 8) micHistory.shift();
 
-        // Troba la nota més freqüent en l'historial; requereix 4 de 6 iguals
-        if (micHistory.length >= 6) {
-          const counts = {};
-          micHistory.forEach(n => counts[n] = (counts[n] || 0) + 1);
-          let bestNote = null, bestCount = 0;
-          for (const n in counts) {
-            if (counts[n] > bestCount) { bestCount = counts[n]; bestNote = n; }
+          // Requereix 6 de 8 frames iguals + silenci previ per confirmar
+          if (micHistory.length >= 8 && micSilenceFramesSinceMatch >= SILENCE_FRAMES_REQUIRED) {
+            const counts = {};
+            micHistory.forEach(n => counts[n] = (counts[n] || 0) + 1);
+            let bestNote = null, bestCount = 0;
+            for (const n in counts) {
+              if (counts[n] > bestCount) { bestCount = counts[n]; bestNote = n; }
+            }
+            const now = performance.now();
+            if (bestCount >= 6 && now - micLastMatchAt > 1200) {
+              micLastMatchAt = now;
+              micSilenceFramesSinceMatch = 0;
+              micHistory = [];
+              const btn = document.querySelector('#screen-train .note-btn[data-note="' + bestNote + '"]');
+              if (btn) btn.click();
+            }
           }
-          const now = performance.now();
-          if (bestCount >= 4 && now - micLastMatchAt > 800) {
-            micLastMatchAt = now;
-            micHistory = [];
-            const btn = document.querySelector('#screen-train .note-btn[data-note="' + bestNote + '"]');
-            if (btn) btn.click();
-          }
+        } else {
+          if (micHistory.length > 0) micHistory.shift();
         }
       } else {
-        // Reset historial si detecció no és vàlida però hi ha so
-        if (micHistory.length > 0) micHistory.shift();
+        micStatus.textContent = "...";
+        micStatus.classList.remove("detected");
       }
     } else {
-      micStatus.textContent = rms < MIN_RMS ? "🔇 silenci" : "...";
+      // Sota el threshold: silenci clar
+      micStatus.textContent = "🔇 silenci";
       micStatus.classList.remove("detected");
       micHistory = [];
     }
