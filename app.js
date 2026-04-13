@@ -153,15 +153,41 @@
     3: null // serà RANGES complet
   };
 
-  // ---------- ESTADÍSTIQUES PER NOTA ----------
-  const TRAIN_STATS_KEY = "trainNoteStats_v1";
+  // ---------- PERFILS + ESTADÍSTIQUES PER NOTA ----------
+  const PROFILES_KEY = "profiles_v1";    // { list: [], current: "" }
+  const STATS_KEY    = "statsByProfile_v1"; // { [profileName]: { "clef|note": {correct,wrong} } }
 
-  function loadTrainStats() {
-    try { return JSON.parse(localStorage.getItem(TRAIN_STATS_KEY) || "{}"); }
+  function loadProfiles() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(PROFILES_KEY) || "null");
+      if (raw && Array.isArray(raw.list) && raw.list.length) return raw;
+    } catch (e) {}
+    const init = { list: ["Convidat"], current: "Convidat" };
+    localStorage.setItem(PROFILES_KEY, JSON.stringify(init));
+    return init;
+  }
+  function saveProfiles(p) {
+    try { localStorage.setItem(PROFILES_KEY, JSON.stringify(p)); } catch (e) {}
+  }
+
+  function loadAllStats() {
+    try { return JSON.parse(localStorage.getItem(STATS_KEY) || "{}"); }
     catch (e) { return {}; }
   }
-  function saveTrainStats(s) {
-    try { localStorage.setItem(TRAIN_STATS_KEY, JSON.stringify(s)); } catch (e) {}
+  function saveAllStats(s) {
+    try { localStorage.setItem(STATS_KEY, JSON.stringify(s)); } catch (e) {}
+  }
+  function currentProfile() {
+    return loadProfiles().current;
+  }
+  function loadTrainStats() {
+    const all = loadAllStats();
+    return all[currentProfile()] || {};
+  }
+  function saveTrainStats(profileStats) {
+    const all = loadAllStats();
+    all[currentProfile()] = profileStats;
+    saveAllStats(all);
   }
   function recordTrainAnswer(clef, note, isCorrect) {
     const s = loadTrainStats();
@@ -187,6 +213,41 @@
     if (top.length === 0) return null;
     return top[Math.floor(Math.random() * top.length)];
   }
+
+  // UI
+  const profileSelect = document.getElementById("profile-select");
+  const profileNewBtn = document.getElementById("profile-new-btn");
+
+  function refreshProfileUI() {
+    const p = loadProfiles();
+    profileSelect.innerHTML = "";
+    p.list.forEach(name => {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      if (name === p.current) opt.selected = true;
+      profileSelect.appendChild(opt);
+    });
+  }
+
+  profileSelect.addEventListener("change", () => {
+    const p = loadProfiles();
+    p.current = profileSelect.value;
+    saveProfiles(p);
+  });
+
+  profileNewBtn.addEventListener("click", () => {
+    const name = prompt("Nom del nou perfil:");
+    if (!name || !name.trim()) return;
+    const trimmed = name.trim().slice(0, 20);
+    const p = loadProfiles();
+    if (!p.list.includes(trimmed)) p.list.push(trimmed);
+    p.current = trimmed;
+    saveProfiles(p);
+    refreshProfileUI();
+  });
+
+  refreshProfileUI();
 
   function pickNoteForLevel(clef, level) {
     const lvl = parseInt(level, 10) || 3;
