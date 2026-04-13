@@ -1588,7 +1588,7 @@
   const spNoteButtons  = document.querySelectorAll(".sp-note-btn");
 
   const SP_MAX_SPEED = 10;
-  const SP_STREAK_TO_ADVANCE = 10;
+  const SP_STREAK_TO_ADVANCE = 30;
 
   let spRunning   = false;
   let spState     = "idle"; // idle | playing | paused | levelup | won
@@ -1627,7 +1627,12 @@
   function spPxPerMs() { return spPxPerSec() / 1000; }
 
   function spSpawnInterval() {
-    return Math.max(500, 200000 / spPxPerSec());
+    // Espai entre notes (en píxels visuals): a velocitat 1 = 240px, a 10 = 100px
+    // Així a velocitats altes les notes s'apropen visualment molt més
+    const lvl = spCurrentSpeed;
+    const spaceBetweenPx = Math.max(80, 260 - lvl * 18); // 1→242, 10→80
+    const interval = (spaceBetweenPx / spPxPerSec()) * 1000;
+    return Math.max(180, interval);
   }
 
   function spUpdateStats() {
