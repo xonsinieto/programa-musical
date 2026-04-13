@@ -249,6 +249,18 @@
 
   refreshProfileUI();
 
+  // En obrir l'app amb el perfil "Convidat", netegem les seves estadístiques.
+  // Els perfils nomenats mantenen la memòria entre sessions.
+  (function resetGuestStats() {
+    if (currentProfile() === "Convidat") {
+      const all = loadAllStats();
+      if (all["Convidat"]) {
+        delete all["Convidat"];
+        saveAllStats(all);
+      }
+    }
+  })();
+
   function pickNoteForLevel(clef, level) {
     const lvl = parseInt(level, 10) || 3;
     const pool = (lvl === 3 || !LEVELS[lvl]) ? RANGES[clef] : LEVELS[lvl][clef];
