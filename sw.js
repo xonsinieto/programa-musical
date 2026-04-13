@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v6";
+const CACHE = "lectura-notes-v7";
 const FILES = [
   "./",
   "./index.html",
@@ -27,11 +27,15 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
+  // Xarxa-primer amb `cache: "no-cache"` → sempre revalida amb servidor.
+  // Només cau al caché si la xarxa falla (offline).
   event.respondWith(
-    fetch(req)
+    fetch(req, { cache: "no-cache" })
       .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((cache) => cache.put(req, copy)).catch(() => null);
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((cache) => cache.put(req, copy)).catch(() => null);
+        }
         return res;
       })
       .catch(() => caches.match(req).then((r) => r || caches.match("./index.html")))

@@ -581,27 +581,17 @@
       if (micCtx.state === "suspended") await micCtx.resume();
 
       const source = micCtx.createMediaStreamSource(micStream);
-
-      // Passa-alt a 70 Hz (treu soroll greu ambient)
-      const highPass = micCtx.createBiquadFilter();
-      highPass.type = "highpass";
-      highPass.frequency.value = 70;
-      highPass.Q.value = 0.7;
-
-      // Passa-baix a 1200 Hz (treu harmònics aguts que confonen la detecció)
-      const lowPass = micCtx.createBiquadFilter();
-      lowPass.type = "lowpass";
-      lowPass.frequency.value = 1200;
-      lowPass.Q.value = 0.7;
-
       micAnalyser = micCtx.createAnalyser();
       micAnalyser.fftSize = 2048;
-      source.connect(highPass);
-      highPass.connect(lowPass);
-      lowPass.connect(micAnalyser);
+      micAnalyser.smoothingTimeConstant = 0;
+      // Connexió directa sense filtres per diagnosticar
+      source.connect(micAnalyser);
 
-      micDetector = micDetectorObj; // { findPitch: autoCorrelatePitch }
+      micDetector = micDetectorObj;
       micBuffer = new Float32Array(micAnalyser.fftSize);
+
+      console.log("[MIC] Stream actiu. sampleRate:", micCtx.sampleRate,
+                  "tracks:", micStream.getAudioTracks().map(t => t.label + " enabled=" + t.enabled + " muted=" + t.muted));
     } catch (e) {
       alert("Error inicialitzant la detecció de veu: " + e.message);
       stopMic();

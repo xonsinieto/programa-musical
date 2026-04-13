@@ -234,7 +234,20 @@
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js").catch(() => {});
+        navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" })
+          .then((reg) => {
+            // Check for updates on every load
+            reg.update().catch(() => {});
+          })
+          .catch(() => {});
+
+        // Quan hi ha nou SW actiu, recarreguem la pàgina (una vegada)
+        let reloaded = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (reloaded) return;
+          reloaded = true;
+          window.location.reload();
+        });
       });
     }
   </script>
