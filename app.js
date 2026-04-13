@@ -466,6 +466,79 @@
   };
   const NATURAL_SEMITONES = [0, 2, 4, 5, 7, 9, 11];
 
+  // Detecció de pitch per autocorrelació inline (sense CDN).
+  // Retorna [freq_Hz, clarity_0_1].
+  function autoCorrelatePitch(buffer, sampleRate) {
+    const SIZE = buffer.length;
+    // RMS
+    let rms = 0;
+    for (let i = 0; i < SIZE; i++) rms += buffer[i] * buffer[i];
+    rms = Math.sqrt(rms / SIZE);
+    if (rms < 0.005) return [0, 0];
+
+    // Retalla silenci a inici/fi
+    const thresh = 0.02;
+    let r1 = 0, r2 = SIZE - 1;
+    for (let i = 0; i < SIZE / 2; i++) {
+      if (Math.abs(buffer[i]) >= thresh) { r1 = i; break; }
+    }
+    for (let i = 1; i < SIZE / 2; i++) {
+      if (Math.abs(buffer[SIZE - i]) >= thresh) { r2 = SIZE - i; break; }
+    }
+    const trimStart = r1;
+    const trimEnd   = r2;
+    const n = trimEnd - trimStart;
+    if (n < 100) return [0, 0];
+
+    // Autocorrelació
+    const minFreq = 70;
+    const maxFreq = 1200;
+    const maxLag = Math.min(n - 1, Math.floor(sampleRate / minFreq));
+    const minLag = Math.floor(sampleRate / maxFreq);
+
+    // Energia de referència (lag 0)
+    let c0 = 0;
+    for (let i = trimStart; i < trimEnd; i++) c0 += buffer[i] * buffer[i];
+    if (c0 < 1e-6) return [0, 0];
+
+    let bestLag = 0;
+    let bestCorr = -1;
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      let c = 0;
+      const end = trimEnd - lag;
+      for (let i = trimStart; i < end; i++) {
+        c += buffer[i] * buffer[i + lag];
+      }
+      const normalized = c / c0;
+      if (normalized > bestCorr) {
+        bestCorr = normalized;
+        bestLag = lag;
+      }
+    }
+    if (bestLag < minLag) return [0, 0];
+
+    // Interpolació parabòlica per precisió sub-mostra
+    let refinedLag = bestLag;
+    if (bestLag > minLag && bestLag < maxLag) {
+      const lm1 = bestLag - 1, lp1 = bestLag + 1;
+      let cm = 0, cp = 0;
+      for (let i = trimStart; i < trimEnd - lm1; i++) cm += buffer[i] * buffer[i + lm1];
+      for (let i = trimStart; i < trimEnd - lp1; i++) cp += buffer[i] * buffer[i + lp1];
+      const cb = bestCorr * c0;
+      const denom = cm - 2 * cb + cp;
+      if (Math.abs(denom) > 1e-9) {
+        const delta = 0.5 * (cm - cp) / denom;
+        refinedLag = bestLag + delta;
+      }
+    }
+
+    const freq = sampleRate / refinedLag;
+    return [freq, Math.max(0, bestCorr)];
+  }
+
+  // Wrapper per compatibilitat amb la crida micDetector.findPitch(buffer, sampleRate)
+  const micDetectorObj = { findPitch: autoCorrelatePitch };
+
   function freqToNoteCa(freq) {
     // MIDI (continu) a partir de freq: A4=69
     const midi = 12 * Math.log2(freq / 440) + 69;
@@ -523,7 +596,7 @@
       highPass.connect(lowPass);
       lowPass.connect(micAnalyser);
 
-      micDetector = autoCorrelatePitch; // detector inline
+      micDetector = micDetectorObj; // { findPitch: autoCorrelatePitch }
       micBuffer = new Float32Array(micAnalyser.fftSize);
     } catch (e) {
       alert("Error inicialitzant la detecció de veu: " + e.message);
