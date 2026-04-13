@@ -1,48 +1,133 @@
 (function () {
   const VF = Vex.Flow;
 
+  // Cançons completes amb durades. Durades: "w"=rodona, "h"=blanca,
+  // "q"=negra, "8"=corxera, "16"=semicorxera. Clef per cada nota.
   const SONGS = [
     {
-      id: "frere-jacques",
-      name: "Germà Joan",
-      clef: "treble",
-      notes: ["c/4","d/4","e/4","c/4","c/4","d/4","e/4","c/4",
-              "e/4","f/4","g/4","e/4","f/4","g/4"]
-    },
-    {
-      id: "twinkle",
-      name: "Estrelleta on ets",
-      clef: "treble",
-      notes: ["c/4","c/4","g/4","g/4","a/4","a/4","g/4",
-              "f/4","f/4","e/4","e/4","d/4","d/4","c/4"]
-    },
-    {
       id: "ode-joy",
-      name: "Oda a l'Alegria",
-      clef: "treble",
-      notes: ["e/4","e/4","f/4","g/4","g/4","f/4","e/4","d/4",
-              "c/4","c/4","d/4","e/4","e/4","d/4","d/4"]
+      name: "Oda a l'Alegria (Beethoven) — complet",
+      notes: [
+        // Frase 1
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"treble",note:"e/4",dur:"q"},
+        {clef:"treble",note:"f/4",dur:"q"},{clef:"treble",note:"g/4",dur:"q"},
+        {clef:"treble",note:"g/4",dur:"q"},{clef:"treble",note:"f/4",dur:"q"},
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"treble",note:"d/4",dur:"q"},
+        {clef:"treble",note:"c/4",dur:"q"},{clef:"treble",note:"c/4",dur:"q"},
+        {clef:"treble",note:"d/4",dur:"q"},{clef:"treble",note:"e/4",dur:"q"},
+        {clef:"treble",note:"e/4",dur:"h"},{clef:"treble",note:"d/4",dur:"q"},
+        {clef:"treble",note:"d/4",dur:"h"},
+        // Frase 2 (repetició amb final)
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"treble",note:"e/4",dur:"q"},
+        {clef:"treble",note:"f/4",dur:"q"},{clef:"treble",note:"g/4",dur:"q"},
+        {clef:"treble",note:"g/4",dur:"q"},{clef:"treble",note:"f/4",dur:"q"},
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"treble",note:"d/4",dur:"q"},
+        {clef:"treble",note:"c/4",dur:"q"},{clef:"treble",note:"c/4",dur:"q"},
+        {clef:"treble",note:"d/4",dur:"q"},{clef:"treble",note:"e/4",dur:"q"},
+        {clef:"treble",note:"d/4",dur:"h"},{clef:"treble",note:"c/4",dur:"q"},
+        {clef:"treble",note:"c/4",dur:"h"}
+      ]
     },
     {
-      id: "mary-lamb",
-      name: "Mary Had a Little Lamb",
-      clef: "treble",
-      notes: ["e/4","d/4","c/4","d/4","e/4","e/4","e/4",
-              "d/4","d/4","d/4","e/4","g/4","g/4"]
+      id: "twinkle-full",
+      name: "Estrelleta on ets — complet",
+      notes: [
+        {clef:"treble",note:"c/4",dur:"q"},{clef:"treble",note:"c/4",dur:"q"},
+        {clef:"treble",note:"g/4",dur:"q"},{clef:"treble",note:"g/4",dur:"q"},
+        {clef:"treble",note:"a/4",dur:"q"},{clef:"treble",note:"a/4",dur:"q"},
+        {clef:"treble",note:"g/4",dur:"h"},
+        {clef:"treble",note:"f/4",dur:"q"},{clef:"treble",note:"f/4",dur:"q"},
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"treble",note:"e/4",dur:"q"},
+        {clef:"treble",note:"d/4",dur:"q"},{clef:"treble",note:"d/4",dur:"q"},
+        {clef:"treble",note:"c/4",dur:"h"},
+        {clef:"treble",note:"g/4",dur:"q"},{clef:"treble",note:"g/4",dur:"q"},
+        {clef:"treble",note:"f/4",dur:"q"},{clef:"treble",note:"f/4",dur:"q"},
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"treble",note:"e/4",dur:"q"},
+        {clef:"treble",note:"d/4",dur:"h"},
+        {clef:"treble",note:"g/4",dur:"q"},{clef:"treble",note:"g/4",dur:"q"},
+        {clef:"treble",note:"f/4",dur:"q"},{clef:"treble",note:"f/4",dur:"q"},
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"treble",note:"e/4",dur:"q"},
+        {clef:"treble",note:"d/4",dur:"h"},
+        {clef:"treble",note:"c/4",dur:"q"},{clef:"treble",note:"c/4",dur:"q"},
+        {clef:"treble",note:"g/4",dur:"q"},{clef:"treble",note:"g/4",dur:"q"},
+        {clef:"treble",note:"a/4",dur:"q"},{clef:"treble",note:"a/4",dur:"q"},
+        {clef:"treble",note:"g/4",dur:"h"},
+        {clef:"treble",note:"f/4",dur:"q"},{clef:"treble",note:"f/4",dur:"q"},
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"treble",note:"e/4",dur:"q"},
+        {clef:"treble",note:"d/4",dur:"q"},{clef:"treble",note:"d/4",dur:"q"},
+        {clef:"treble",note:"c/4",dur:"h"}
+      ]
     },
     {
-      id: "happy-birthday",
-      name: "Aniversari Feliç",
-      clef: "treble",
-      notes: ["c/4","c/4","d/4","c/4","f/4","e/4",
-              "c/4","c/4","d/4","c/4","g/4","f/4"]
+      id: "frere-full",
+      name: "Germà Joan — complet",
+      notes: [
+        // Frase 1 (x2)
+        {clef:"treble",note:"c/4",dur:"q"},{clef:"treble",note:"d/4",dur:"q"},
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"treble",note:"c/4",dur:"q"},
+        {clef:"treble",note:"c/4",dur:"q"},{clef:"treble",note:"d/4",dur:"q"},
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"treble",note:"c/4",dur:"q"},
+        // Frase 2 (x2)
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"treble",note:"f/4",dur:"q"},
+        {clef:"treble",note:"g/4",dur:"h"},
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"treble",note:"f/4",dur:"q"},
+        {clef:"treble",note:"g/4",dur:"h"},
+        // Frase 3 (x2) - amb corxeres
+        {clef:"treble",note:"g/4",dur:"8"},{clef:"treble",note:"a/4",dur:"8"},
+        {clef:"treble",note:"g/4",dur:"8"},{clef:"treble",note:"f/4",dur:"8"},
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"treble",note:"c/4",dur:"q"},
+        {clef:"treble",note:"g/4",dur:"8"},{clef:"treble",note:"a/4",dur:"8"},
+        {clef:"treble",note:"g/4",dur:"8"},{clef:"treble",note:"f/4",dur:"8"},
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"treble",note:"c/4",dur:"q"},
+        // Frase 4 (x2)
+        {clef:"treble",note:"c/4",dur:"q"},{clef:"treble",note:"g/3",dur:"q"},
+        {clef:"treble",note:"c/4",dur:"h"},
+        {clef:"treble",note:"c/4",dur:"q"},{clef:"treble",note:"g/3",dur:"q"},
+        {clef:"treble",note:"c/4",dur:"h"}
+      ]
     },
     {
-      id: "scale-up",
-      name: "Escala Do Major",
-      clef: "treble",
-      notes: ["c/4","d/4","e/4","f/4","g/4","a/4","b/4","c/5",
-              "c/5","b/4","a/4","g/4","f/4","e/4","d/4","c/4"]
+      id: "bass-walk",
+      name: "Walking Bass (Clau de Fa)",
+      notes: [
+        {clef:"bass",note:"c/3",dur:"q"},{clef:"bass",note:"e/3",dur:"q"},
+        {clef:"bass",note:"g/3",dur:"q"},{clef:"bass",note:"e/3",dur:"q"},
+        {clef:"bass",note:"f/3",dur:"q"},{clef:"bass",note:"a/3",dur:"q"},
+        {clef:"bass",note:"g/3",dur:"q"},{clef:"bass",note:"f/3",dur:"q"},
+        {clef:"bass",note:"e/3",dur:"q"},{clef:"bass",note:"c/3",dur:"q"},
+        {clef:"bass",note:"d/3",dur:"q"},{clef:"bass",note:"f/3",dur:"q"},
+        {clef:"bass",note:"e/3",dur:"h"},{clef:"bass",note:"c/3",dur:"h"}
+      ]
+    },
+    {
+      id: "canon-pachelbel",
+      name: "Canon de Pachelbel — baix",
+      notes: [
+        // Progressió D-A-Bm-F#m-G-D-G-A (en bass clef, simplificada)
+        {clef:"bass",note:"d/3",dur:"h"},{clef:"bass",note:"a/2",dur:"h"},
+        {clef:"bass",note:"b/2",dur:"h"},{clef:"bass",note:"f/3",dur:"h"},
+        {clef:"bass",note:"g/2",dur:"h"},{clef:"bass",note:"d/3",dur:"h"},
+        {clef:"bass",note:"g/2",dur:"h"},{clef:"bass",note:"a/2",dur:"h"},
+        {clef:"bass",note:"d/3",dur:"h"},{clef:"bass",note:"a/2",dur:"h"},
+        {clef:"bass",note:"b/2",dur:"h"},{clef:"bass",note:"f/3",dur:"h"},
+        {clef:"bass",note:"g/2",dur:"h"},{clef:"bass",note:"d/3",dur:"h"},
+        {clef:"bass",note:"g/2",dur:"h"},{clef:"bass",note:"a/2",dur:"w"}
+      ]
+    },
+    {
+      id: "mixed-duet",
+      name: "Duet — ambdues claus",
+      notes: [
+        {clef:"treble",note:"c/5",dur:"q"},{clef:"bass",note:"c/3",dur:"q"},
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"bass",note:"g/3",dur:"q"},
+        {clef:"treble",note:"g/4",dur:"h"},{clef:"bass",note:"e/3",dur:"h"},
+        {clef:"treble",note:"f/4",dur:"q"},{clef:"bass",note:"d/3",dur:"q"},
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"bass",note:"f/3",dur:"q"},
+        {clef:"treble",note:"d/4",dur:"h"},{clef:"bass",note:"g/2",dur:"h"},
+        {clef:"treble",note:"c/4",dur:"q"},{clef:"bass",note:"c/3",dur:"q"},
+        {clef:"treble",note:"e/4",dur:"q"},{clef:"bass",note:"e/3",dur:"q"},
+        {clef:"treble",note:"g/4",dur:"h"},{clef:"bass",note:"c/3",dur:"h"}
+      ]
     }
   ];
 
@@ -142,8 +227,13 @@
 
     if (mode === "song") {
       const song = SONGS.find(s => s.id === songSelect.value) || SONGS[0];
-      song.notes.forEach((note) => {
-        sequence.push({ clef: song.clef, note, status: "pending" });
+      song.notes.forEach((n) => {
+        sequence.push({
+          clef: n.clef,
+          note: n.note,
+          dur: n.dur || "q",
+          status: "pending"
+        });
       });
       currentStep = 0;
       return;
@@ -199,19 +289,19 @@
     new VF.StaveConnector(trebleStave, bassStave)
       .setType(connectorTypes.SINGLE_RIGHT).setContext(context).draw();
 
-    const duration = "q";     // quarter notes
-    const restDur  = "qr";
-
-    const trebleNotes = sequence.map((step) =>
-      step.clef === "treble"
-        ? new VF.StaveNote({ clef: "treble", keys: [step.note], duration })
-        : new VF.StaveNote({ clef: "treble", keys: ["b/4"],      duration: restDur })
-    );
-    const bassNotes = sequence.map((step) =>
-      step.clef === "bass"
-        ? new VF.StaveNote({ clef: "bass", keys: [step.note], duration })
-        : new VF.StaveNote({ clef: "bass", keys: ["d/3"],      duration: restDur })
-    );
+    const DUR_BEATS = { w: 4, h: 2, q: 1, "8": 0.5, "16": 0.25 };
+    const trebleNotes = sequence.map((step) => {
+      const d = step.dur || "q";
+      return step.clef === "treble"
+        ? new VF.StaveNote({ clef: "treble", keys: [step.note], duration: d })
+        : new VF.StaveNote({ clef: "treble", keys: ["b/4"],      duration: d + "r" });
+    });
+    const bassNotes = sequence.map((step) => {
+      const d = step.dur || "q";
+      return step.clef === "bass"
+        ? new VF.StaveNote({ clef: "bass", keys: [step.note], duration: d })
+        : new VF.StaveNote({ clef: "bass", keys: ["d/3"],      duration: d + "r" });
+    });
 
     sequence.forEach((step, i) => {
       let color = COLORS.neutral;
@@ -233,7 +323,7 @@
       }
     });
 
-    const totalBeats = sequence.length;
+    const totalBeats = sequence.reduce((s, step) => s + (DUR_BEATS[step.dur || "q"] || 1), 0);
     const trebleVoice = new VF.Voice({ num_beats: totalBeats, beat_value: 4 })
       .setMode(VF.Voice.Mode.SOFT)
       .addTickables(trebleNotes);
