@@ -622,6 +622,7 @@
         if (!best || elapsed < best) {
           setBestTime(key, elapsed);
           message = `🎉 ${formatSec(elapsed)} — Bé! Estàs millorant!`;
+          playCongratulations();
         } else {
           message = `Temps: ${formatSec(elapsed)}  (millor: ${formatSec(best)})`;
         }
@@ -1116,6 +1117,14 @@
       osc.connect(oscGain).connect(gain);
       osc.start(now);
       osc.stop(now + dur);
+    });
+  }
+
+  function playCongratulations() {
+    // Arpegi ascendent C-E-G-C alegre amb el so de piano
+    const notes = ["c/5", "e/5", "g/5", "c/6"];
+    notes.forEach((n, i) => {
+      setTimeout(() => playNote(n), i * 130);
     });
   }
 
