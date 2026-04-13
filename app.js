@@ -593,7 +593,7 @@
       console.log("[MIC] Stream actiu. sampleRate:", micCtx.sampleRate,
                   "tracks:", micStream.getAudioTracks().map(t => t.label + " enabled=" + t.enabled + " muted=" + t.muted));
     } catch (e) {
-      alert("Error inicialitzant la detecció de veu: " + e.message);
+      alert("Error inicialitzant la detecció de so: " + e.message);
       stopMic();
       return;
     }
@@ -601,9 +601,9 @@
     micActive = true;
     micHistory = [];
     micLastMatchAt = 0;
-    micSilenceFramesSinceMatch = 999; // accepta primera nota sense esperar silenci
+    micSilenceFramesSinceMatch = 999;
     micBtn.classList.add("active");
-    micBtn.textContent = "🔴 Escoltant...";
+    micBtn.textContent = "🔴 Escoltant so...";
     micLoop();
   }
 
@@ -613,7 +613,7 @@
     if (micStream) micStream.getTracks().forEach(t => t.stop());
     micStream = null;
     micBtn.classList.remove("active");
-    micBtn.textContent = "🎤 Veu";
+    micBtn.textContent = "🎹 So";
     micStatus.textContent = "";
     micStatus.classList.remove("detected");
   }
