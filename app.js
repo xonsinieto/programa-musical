@@ -512,13 +512,11 @@
   function renderModalStaff(container, mainClef, mainNote, secondary) {
     container.innerHTML = "";
 
-    const containerWidth = Math.max(400, container.clientWidth);
+    const containerWidth = Math.max(280, container.clientWidth);
     const height         = 460;
-    // Pentagrama estret amb clef + nota. La nota es col·loca al centre del container.
+    // Pentagrama estret centrat al contenidor; nota centrada dins el pentagrama
     const staveWidth     = 180;
-    const clefApproxW    = 45;
-    // staveX calculat perquè la nota (al tick 0 del voice) acabi al centre exacte del SVG
-    const staveX         = Math.round(containerWidth / 2 - clefApproxW);
+    const staveX         = Math.round((containerWidth - staveWidth) / 2);
     const trebleY        = 140;
     const bassY          = 280;
 
@@ -561,13 +559,16 @@
     const trebleNote = buildStaveNote("treble", trebleInfos);
     const bassNote   = buildStaveNote("bass",   bassInfos);
 
-    const tv = new VF.Voice({ num_beats: 4, beat_value: 4 }).addTickables([trebleNote]);
-    const bv = new VF.Voice({ num_beats: 4, beat_value: 4 }).addTickables([bassNote]);
+    // [GhostNote, note] amb voice de 8 beats: la nota acaba al tick 4 = 50% de l'àrea de format
+    // Combinat amb format width = (staveWidth - clefWidth*2) la nota cau al centre del pentagrama
+    const trebleEls = [new VF.GhostNote({ duration: "w" }), trebleNote];
+    const bassEls   = [new VF.GhostNote({ duration: "w" }), bassNote];
+    const tv = new VF.Voice({ num_beats: 8, beat_value: 4 }).addTickables(trebleEls);
+    const bv = new VF.Voice({ num_beats: 8, beat_value: 4 }).addTickables(bassEls);
 
-    // Format width petit: la nota s'ancora just després del clef
     new VF.Formatter()
       .joinVoices([tv, bv])
-      .format([tv, bv], 40);
+      .format([tv, bv], staveWidth - 90);
 
     tv.draw(context, trebleStave);
     bv.draw(context, bassStave);
