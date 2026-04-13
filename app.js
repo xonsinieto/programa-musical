@@ -562,7 +562,11 @@
   async function startMic() {
     try {
       micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true }
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,   // abans true → filtrava la veu com a soroll
+          autoGainControl: false     // abans true → atenuava el senyal
+        }
       });
     } catch (e) {
       alert("No s'ha pogut accedir al micròfon. Dona permís al navegador.");
@@ -632,29 +636,31 @@
     for (let i = 0; i < micBuffer.length; i++) sumSq += micBuffer[i] * micBuffer[i];
     const rms = Math.sqrt(sumSq / micBuffer.length);
 
-    const MIN_RMS_DETECT  = 0.06;  // volum clarament audible (abans 0.015, massa sensible)
-    const MIN_RMS_SILENCE = 0.03;  // per sota → silenci (histèresi)
-    const MIN_CLARITY     = 0.92;
-    const SILENCE_FRAMES_REQUIRED = 15; // ~250ms de silenci abans d'acceptar nova nota
+    const MIN_RMS_DETECT  = 0.01;  // sensible per micròfons fluixos
+    const MIN_RMS_SILENCE = 0.005;
+    const MIN_CLARITY     = 0.85;
+    const SILENCE_FRAMES_REQUIRED = 10;
 
     const isSilent = rms < MIN_RMS_SILENCE;
     if (isSilent) micSilenceFramesSinceMatch++;
 
+    // SEMPRE mostrem el RMS per poder diagnosticar
+    const rmsStr = "rms:" + rms.toFixed(3);
+
     if (rms > MIN_RMS_DETECT) {
       const [freq, clarity] = micDetector.findPitch(micBuffer, micCtx.sampleRate);
-      if (clarity > MIN_CLARITY && freq > 70 && freq < 1200) {
+      if (freq > 60 && freq < 1500) {
         const noteCa = freqToNoteCa(freq);
         micStatus.textContent = (noteCa ? noteCa.toUpperCase() : "?") +
-                                "  " + Math.round(freq) + " Hz  rms:" + rms.toFixed(2);
-        if (noteCa) micStatus.classList.add("detected");
-        else micStatus.classList.remove("detected");
+                                "  " + Math.round(freq) + "Hz  " + rmsStr +
+                                "  c:" + clarity.toFixed(2);
+        if (noteCa && clarity > MIN_CLARITY) {
+          micStatus.classList.add("detected");
 
-        if (noteCa) {
           micHistory.push(noteCa);
-          if (micHistory.length > 8) micHistory.shift();
+          if (micHistory.length > 6) micHistory.shift();
 
-          // Requereix 6 de 8 frames iguals + silenci previ per confirmar
-          if (micHistory.length >= 8 && micSilenceFramesSinceMatch >= SILENCE_FRAMES_REQUIRED) {
+          if (micHistory.length >= 6 && micSilenceFramesSinceMatch >= SILENCE_FRAMES_REQUIRED) {
             const counts = {};
             micHistory.forEach(n => counts[n] = (counts[n] || 0) + 1);
             let bestNote = null, bestCount = 0;
@@ -662,7 +668,7 @@
               if (counts[n] > bestCount) { bestCount = counts[n]; bestNote = n; }
             }
             const now = performance.now();
-            if (bestCount >= 6 && now - micLastMatchAt > 1200) {
+            if (bestCount >= 4 && now - micLastMatchAt > 1000) {
               micLastMatchAt = now;
               micSilenceFramesSinceMatch = 0;
               micHistory = [];
@@ -671,15 +677,14 @@
             }
           }
         } else {
-          if (micHistory.length > 0) micHistory.shift();
+          micStatus.classList.remove("detected");
         }
       } else {
-        micStatus.textContent = "...";
+        micStatus.textContent = "senyal  " + rmsStr;
         micStatus.classList.remove("detected");
       }
     } else {
-      // Sota el threshold: silenci clar
-      micStatus.textContent = "🔇 silenci";
+      micStatus.textContent = "🔇 " + rmsStr;
       micStatus.classList.remove("detected");
       micHistory = [];
     }
