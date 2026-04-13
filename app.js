@@ -447,6 +447,123 @@
   });
   songSelect.addEventListener("change", startRound);
 
+  // ---------- DETECCIÓ DE PITCH (VEU / INSTRUMENT) ----------
+  const micBtn = document.getElementById("mic-btn");
+  let micActive   = false;
+  let micStream   = null;
+  let micCtx      = null;
+  let micAnalyser = null;
+  let micDetector = null;
+  let micRAF      = null;
+  let micBuffer   = null;
+  let micLastMatchAt = 0;
+  let micLastNote    = null;
+  let micStableCount = 0;
+
+  const NOTE_CLASS_BY_SEMITONE = {
+    0: "do",  2: "re",  4: "mi",  5: "fa",  7: "sol", 9: "la", 11: "si"
+  };
+
+  function freqToNoteCa(freq) {
+    // MIDI exacte a partir de freq: C4=60, A4=69
+    const midi = 12 * Math.log2(freq / 440) + 69;
+    const nearest = Math.round(midi);
+    // Només acceptem si la desviació és < 40 cents (precisió)
+    if (Math.abs(midi - nearest) > 0.4) return null;
+    const semi = ((nearest % 12) + 12) % 12;
+    return NOTE_CLASS_BY_SEMITONE[semi] || null;
+  }
+
+  async function startMic() {
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true }
+      });
+    } catch (e) {
+      alert("No s'ha pogut accedir al micròfon. Dona permís al navegador.");
+      return;
+    }
+
+    try {
+      if (!micCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        micCtx = new AC();
+      }
+      if (micCtx.state === "suspended") await micCtx.resume();
+
+      const source = micCtx.createMediaStreamSource(micStream);
+      micAnalyser = micCtx.createAnalyser();
+      micAnalyser.fftSize = 2048;
+      source.connect(micAnalyser);
+
+      const mod = await import("https://esm.sh/pitchy@4");
+      micDetector = mod.PitchDetector.forFloat32Array(micAnalyser.fftSize);
+      micBuffer = new Float32Array(micAnalyser.fftSize);
+    } catch (e) {
+      alert("Error inicialitzant la detecció de veu: " + e.message);
+      stopMic();
+      return;
+    }
+
+    micActive = true;
+    micLastNote = null;
+    micStableCount = 0;
+    micLastMatchAt = 0;
+    micBtn.classList.add("active");
+    micBtn.textContent = "🔴 Escoltant...";
+    micLoop();
+  }
+
+  function stopMic() {
+    micActive = false;
+    if (micRAF) cancelAnimationFrame(micRAF);
+    if (micStream) micStream.getTracks().forEach(t => t.stop());
+    micStream = null;
+    micBtn.classList.remove("active");
+    micBtn.textContent = "🎤 Veu";
+  }
+
+  function micLoop() {
+    if (!micActive || !micAnalyser || !micDetector) return;
+    micAnalyser.getFloatTimeDomainData(micBuffer);
+    const [freq, clarity] = micDetector.findPitch(micBuffer, micCtx.sampleRate);
+
+    if (clarity > 0.92 && freq > 70 && freq < 2100) {
+      const noteCa = freqToNoteCa(freq);
+      if (noteCa) {
+        if (noteCa === micLastNote) {
+          micStableCount++;
+        } else {
+          micLastNote = noteCa;
+          micStableCount = 1;
+        }
+        // Requereix 3 frames estables consecutius i >800ms des de l'últim match
+        const now = performance.now();
+        if (micStableCount >= 3 && now - micLastMatchAt > 900) {
+          micLastMatchAt = now;
+          micStableCount = 0;
+          const btn = document.querySelector('#screen-train .note-btn[data-note="' + noteCa + '"]');
+          if (btn) btn.click();
+        }
+      }
+    } else {
+      micLastNote = null;
+      micStableCount = 0;
+    }
+
+    micRAF = requestAnimationFrame(micLoop);
+  }
+
+  micBtn.addEventListener("click", () => {
+    if (micActive) stopMic();
+    else startMic();
+  });
+
+  // Parem el mic si l'usuari canvia de pestanya
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && micActive) stopMic();
+  });
+
   window.addEventListener("resize", () => {
     if (document.getElementById("screen-train").classList.contains("active") && sequence.length > 0) {
       render();
