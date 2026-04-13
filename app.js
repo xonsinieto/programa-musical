@@ -458,8 +458,7 @@
   let micRAF      = null;
   let micBuffer   = null;
   let micLastMatchAt = 0;
-  let micLastNote    = null;
-  let micStableCount = 0;
+  let micHistory     = []; // últimes N deteccions de nota
 
   const NOTE_CLASS_BY_SEMITONE = {
     0: "do",  2: "re",  4: "mi",  5: "fa",  7: "sol", 9: "la", 11: "si"
@@ -504,9 +503,24 @@
       if (micCtx.state === "suspended") await micCtx.resume();
 
       const source = micCtx.createMediaStreamSource(micStream);
+
+      // Passa-alt a 70 Hz (treu soroll greu ambient)
+      const highPass = micCtx.createBiquadFilter();
+      highPass.type = "highpass";
+      highPass.frequency.value = 70;
+      highPass.Q.value = 0.7;
+
+      // Passa-baix a 1200 Hz (treu harmònics aguts que confonen la detecció)
+      const lowPass = micCtx.createBiquadFilter();
+      lowPass.type = "lowpass";
+      lowPass.frequency.value = 1200;
+      lowPass.Q.value = 0.7;
+
       micAnalyser = micCtx.createAnalyser();
-      micAnalyser.fftSize = 2048;
-      source.connect(micAnalyser);
+      micAnalyser.fftSize = 4096; // més resolució per pitches greus
+      source.connect(highPass);
+      highPass.connect(lowPass);
+      lowPass.connect(micAnalyser);
 
       const mod = await import("https://esm.sh/pitchy@4");
       micDetector = mod.PitchDetector.forFloat32Array(micAnalyser.fftSize);
@@ -518,8 +532,7 @@
     }
 
     micActive = true;
-    micLastNote = null;
-    micStableCount = 0;
+    micHistory = [];
     micLastMatchAt = 0;
     micBtn.classList.add("active");
     micBtn.textContent = "🔴 Escoltant...";
@@ -540,38 +553,52 @@
   function micLoop() {
     if (!micActive || !micAnalyser || !micDetector) return;
     micAnalyser.getFloatTimeDomainData(micBuffer);
+
+    // Calcula RMS per detectar si hi ha veu (volum mínim)
+    let sumSq = 0;
+    for (let i = 0; i < micBuffer.length; i++) sumSq += micBuffer[i] * micBuffer[i];
+    const rms = Math.sqrt(sumSq / micBuffer.length);
+
     const [freq, clarity] = micDetector.findPitch(micBuffer, micCtx.sampleRate);
 
-    if (clarity > 0.82 && freq > 60 && freq < 2200) {
-      const noteCa = freqToNoteCa(freq);
-      if (noteCa) {
-        // Indicador visual en directe
-        micStatus.textContent = noteCa.toUpperCase() + "  " + Math.round(freq) + " Hz";
-        micStatus.classList.add("detected");
+    const MIN_RMS = 0.015;
+    const MIN_CLARITY = 0.9;
 
-        if (noteCa === micLastNote) {
-          micStableCount++;
-        } else {
-          micLastNote = noteCa;
-          micStableCount = 1;
-        }
-        // 2 frames estables + cooldown 700ms
-        const now = performance.now();
-        if (micStableCount >= 2 && now - micLastMatchAt > 700) {
-          micLastMatchAt = now;
-          micStableCount = 0;
-          const btn = document.querySelector('#screen-train .note-btn[data-note="' + noteCa + '"]');
-          if (btn) btn.click();
+    if (rms > MIN_RMS && clarity > MIN_CLARITY && freq > 70 && freq < 1200) {
+      const noteCa = freqToNoteCa(freq);
+      micStatus.textContent = (noteCa ? noteCa.toUpperCase() : "?") +
+                              "  " + Math.round(freq) + " Hz  c:" + clarity.toFixed(2);
+      if (noteCa) micStatus.classList.add("detected");
+      else micStatus.classList.remove("detected");
+
+      if (noteCa) {
+        micHistory.push(noteCa);
+        if (micHistory.length > 6) micHistory.shift();
+
+        // Troba la nota més freqüent en l'historial; requereix 4 de 6 iguals
+        if (micHistory.length >= 6) {
+          const counts = {};
+          micHistory.forEach(n => counts[n] = (counts[n] || 0) + 1);
+          let bestNote = null, bestCount = 0;
+          for (const n in counts) {
+            if (counts[n] > bestCount) { bestCount = counts[n]; bestNote = n; }
+          }
+          const now = performance.now();
+          if (bestCount >= 4 && now - micLastMatchAt > 800) {
+            micLastMatchAt = now;
+            micHistory = [];
+            const btn = document.querySelector('#screen-train .note-btn[data-note="' + bestNote + '"]');
+            if (btn) btn.click();
+          }
         }
       } else {
-        micStatus.textContent = Math.round(freq) + " Hz ?";
-        micStatus.classList.remove("detected");
+        // Reset historial si detecció no és vàlida però hi ha so
+        if (micHistory.length > 0) micHistory.shift();
       }
     } else {
-      micLastNote = null;
-      micStableCount = 0;
-      micStatus.textContent = "...";
+      micStatus.textContent = rms < MIN_RMS ? "🔇 silenci" : "...";
       micStatus.classList.remove("detected");
+      micHistory = [];
     }
 
     micRAF = requestAnimationFrame(micLoop);
