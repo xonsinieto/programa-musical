@@ -74,6 +74,58 @@ nav.tabs .tab.active {
 .screen { display: none; }
 .screen.active { display: block; }
 
+.profile-bar {
+  background: #3498db;
+  color: #fff;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 1rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.profile-bar .profile-label {
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.profile-bar select {
+  background: #fff;
+  color: #2c3e50;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 1rem;
+  min-width: 140px;
+  cursor: pointer;
+}
+
+.profile-bar #profile-new-btn {
+  background: #fff;
+  color: #3498db;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-bar #profile-new-btn:hover {
+  background: #ecf0f1;
+}
+
 .controls {
   display: flex;
   justify-content: center;
@@ -516,14 +568,6 @@ nav.tabs .tab.active {
   border: 1px solid #bdc3c7;
 }
 
-#profile-new-btn {
-  background: #ecf0f1;
-  color: #2c3e50;
-  font-weight: 700;
-  border: 1px solid #bdc3c7;
-  min-width: 32px;
-  padding: 4px 10px;
-}
 
 #mic-btn.active {
   background: #e74c3c;
