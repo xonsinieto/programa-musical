@@ -316,6 +316,42 @@ nav.tabs .tab.active {
 .big-btn.knew   { background: #27ae60; }
 .big-btn.didnt  { background: #e74c3c; }
 
+/* Mòbil horitzontal: aprofitar amplada i reduir alçada */
+@media (max-height: 500px) and (orientation: landscape) {
+  header {
+    padding: 4px 8px;
+  }
+  header h1 {
+    font-size: 0.95rem;
+    margin: 0 0 4px 0;
+  }
+  nav.tabs .tab {
+    padding: 4px 10px;
+    font-size: 0.85rem;
+  }
+  main {
+    padding: 0 8px;
+    margin: 6px auto;
+  }
+  .controls {
+    margin-bottom: 6px;
+  }
+  #sp-game-container {
+    min-height: 300px !important;
+    height: 300px !important;
+    overflow: hidden;
+    padding: 0;
+  }
+  #sp-game-container svg {
+    transform: scale(0.65);
+    transform-origin: top left;
+  }
+  #staff-container,
+  #fc-staff-container {
+    min-height: 320px;
+  }
+}
+
 @media (max-width: 600px) {
   .fc-buttons {
     grid-template-columns: 1fr;
@@ -614,8 +650,7 @@ main {
     flex-wrap: wrap;
   }
   #staff-container,
-  #fc-staff-container,
-  #sp-game-container {
+  #fc-staff-container {
     min-height: 480px;
     padding: 10px 0;
     margin-bottom: 8px;
@@ -623,6 +658,17 @@ main {
   #staff-container {
     width: 100vw;
     overflow-x: auto;
+  }
+  #sp-game-container {
+    min-height: 280px;
+    height: 280px;
+    padding: 0;
+    margin-bottom: 8px;
+    overflow: hidden;
+  }
+  #sp-game-container svg {
+    transform: scale(0.58);
+    transform-origin: top left;
   }
   #ref-staff-container {
     padding: 10px 0 !important;
