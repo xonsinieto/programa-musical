@@ -1627,12 +1627,11 @@
   function spPxPerMs() { return spPxPerSec() / 1000; }
 
   function spSpawnInterval() {
-    // Espai entre notes (en píxels visuals): a velocitat 1 = 240px, a 10 = 100px
-    // Així a velocitats altes les notes s'apropen visualment molt més
+    // Espai entre notes molt més apretat a alt nivell
     const lvl = spCurrentSpeed;
-    const spaceBetweenPx = Math.max(80, 260 - lvl * 18); // 1→242, 10→80
+    const spaceBetweenPx = Math.max(35, 220 - lvl * 22); // 1→198, 5→110, 10→35
     const interval = (spaceBetweenPx / spPxPerSec()) * 1000;
-    return Math.max(180, interval);
+    return Math.max(80, interval);
   }
 
   function spUpdateStats() {
