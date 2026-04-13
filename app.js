@@ -448,7 +448,8 @@
   songSelect.addEventListener("change", startRound);
 
   // ---------- DETECCIÓ DE PITCH (VEU / INSTRUMENT) ----------
-  const micBtn = document.getElementById("mic-btn");
+  const micBtn    = document.getElementById("mic-btn");
+  const micStatus = document.getElementById("mic-status");
   let micActive   = false;
   let micStream   = null;
   let micCtx      = null;
@@ -463,15 +464,26 @@
   const NOTE_CLASS_BY_SEMITONE = {
     0: "do",  2: "re",  4: "mi",  5: "fa",  7: "sol", 9: "la", 11: "si"
   };
+  const NATURAL_SEMITONES = [0, 2, 4, 5, 7, 9, 11];
 
   function freqToNoteCa(freq) {
-    // MIDI exacte a partir de freq: C4=60, A4=69
+    // MIDI (continu) a partir de freq: A4=69
     const midi = 12 * Math.log2(freq / 440) + 69;
-    const nearest = Math.round(midi);
-    // Només acceptem si la desviació és < 40 cents (precisió)
-    if (Math.abs(midi - nearest) > 0.4) return null;
-    const semi = ((nearest % 12) + 12) % 12;
-    return NOTE_CLASS_BY_SEMITONE[semi] || null;
+    const semi = ((midi % 12) + 12) % 12; // 0 .. 12
+    // Trobem la nota natural més propera (distància circular en semitons)
+    let bestSemi = 0;
+    let bestDist = 100;
+    for (const n of NATURAL_SEMITONES) {
+      let d = Math.abs(n - semi);
+      if (d > 6) d = 12 - d;
+      if (d < bestDist) {
+        bestDist = d;
+        bestSemi = n;
+      }
+    }
+    // Acceptem fins a 0.85 semitons (~85 cents) de desviació
+    if (bestDist > 0.85) return null;
+    return NOTE_CLASS_BY_SEMITONE[bestSemi] || null;
   }
 
   async function startMic() {
@@ -521,6 +533,8 @@
     micStream = null;
     micBtn.classList.remove("active");
     micBtn.textContent = "🎤 Veu";
+    micStatus.textContent = "";
+    micStatus.classList.remove("detected");
   }
 
   function micLoop() {
@@ -528,27 +542,36 @@
     micAnalyser.getFloatTimeDomainData(micBuffer);
     const [freq, clarity] = micDetector.findPitch(micBuffer, micCtx.sampleRate);
 
-    if (clarity > 0.92 && freq > 70 && freq < 2100) {
+    if (clarity > 0.82 && freq > 60 && freq < 2200) {
       const noteCa = freqToNoteCa(freq);
       if (noteCa) {
+        // Indicador visual en directe
+        micStatus.textContent = noteCa.toUpperCase() + "  " + Math.round(freq) + " Hz";
+        micStatus.classList.add("detected");
+
         if (noteCa === micLastNote) {
           micStableCount++;
         } else {
           micLastNote = noteCa;
           micStableCount = 1;
         }
-        // Requereix 3 frames estables consecutius i >800ms des de l'últim match
+        // 2 frames estables + cooldown 700ms
         const now = performance.now();
-        if (micStableCount >= 3 && now - micLastMatchAt > 900) {
+        if (micStableCount >= 2 && now - micLastMatchAt > 700) {
           micLastMatchAt = now;
           micStableCount = 0;
           const btn = document.querySelector('#screen-train .note-btn[data-note="' + noteCa + '"]');
           if (btn) btn.click();
         }
+      } else {
+        micStatus.textContent = Math.round(freq) + " Hz ?";
+        micStatus.classList.remove("detected");
       }
     } else {
       micLastNote = null;
       micStableCount = 0;
+      micStatus.textContent = "...";
+      micStatus.classList.remove("detected");
     }
 
     micRAF = requestAnimationFrame(micLoop);

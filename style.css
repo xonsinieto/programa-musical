@@ -523,6 +523,19 @@ nav.tabs .tab.active {
   animation: micPulse 1.2s infinite ease-in-out;
 }
 
+.mic-status {
+  font-size: 0.9rem;
+  color: #7f8c8d;
+  font-family: monospace;
+  min-width: 100px;
+  display: inline-block;
+}
+
+.mic-status.detected {
+  color: #3498db;
+  font-weight: 700;
+}
+
 @keyframes micPulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(231,76,60,0.5); }
   50%      { box-shadow: 0 0 0 8px rgba(231,76,60,0); }
