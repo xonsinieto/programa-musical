@@ -234,6 +234,7 @@
     const p = loadProfiles();
     p.current = profileSelect.value;
     saveProfiles(p);
+    if (typeof refreshBestTimeUI === "function") refreshBestTimeUI();
   });
 
   profileNewBtn.addEventListener("click", () => {
@@ -357,6 +358,76 @@
   let answered    = false;
   let correct     = 0;
   let wrong       = 0;
+  let roundStartMs  = 0;
+  let roundEndedMs  = 0;
+  let roundTimerRAF = null;
+  let roundConfigKey = "";
+
+  const runTimeEl  = document.getElementById("run-time");
+  const bestTimeEl = document.getElementById("best-time");
+
+  const BEST_TIMES_KEY = "bestTimesByProfile_v1";
+  function loadBestTimes() {
+    try { return JSON.parse(localStorage.getItem(BEST_TIMES_KEY) || "{}"); }
+    catch (e) { return {}; }
+  }
+  function saveBestTimes(x) {
+    try { localStorage.setItem(BEST_TIMES_KEY, JSON.stringify(x)); } catch (e) {}
+  }
+  function getBestTime(configKey) {
+    const all = loadBestTimes();
+    const profile = currentProfile();
+    return (all[profile] && all[profile][configKey]) || null;
+  }
+  function setBestTime(configKey, seconds) {
+    const all = loadBestTimes();
+    const profile = currentProfile();
+    if (!all[profile]) all[profile] = {};
+    all[profile][configKey] = seconds;
+    saveBestTimes(all);
+  }
+  function currentConfigKey() {
+    const mode = modeSelect.value;
+    const clef = clefSelect.value;
+    const level = levelSelect.value;
+    if (mode === "song") {
+      return "song|" + songSelect.value;
+    }
+    const count = sequence.length;
+    return [clef, level, mode, count].join("|");
+  }
+  function formatSec(sec) {
+    return sec.toFixed(1) + "s";
+  }
+  function refreshBestTimeUI() {
+    if (sequence.length <= 1) {
+      bestTimeEl.textContent = "—";
+      return;
+    }
+    const key = currentConfigKey();
+    const best = getBestTime(key);
+    bestTimeEl.textContent = best ? formatSec(best) : "—";
+  }
+  function startRoundTimer() {
+    roundStartMs = performance.now();
+    roundEndedMs = 0;
+    if (roundTimerRAF) cancelAnimationFrame(roundTimerRAF);
+    const tick = () => {
+      if (roundEndedMs) return;
+      const elapsed = (performance.now() - roundStartMs) / 1000;
+      runTimeEl.textContent = formatSec(elapsed);
+      roundTimerRAF = requestAnimationFrame(tick);
+    };
+    tick();
+  }
+  function endRoundTimer() {
+    if (!roundStartMs || roundEndedMs) return 0;
+    roundEndedMs = performance.now();
+    if (roundTimerRAF) cancelAnimationFrame(roundTimerRAF);
+    const elapsed = (roundEndedMs - roundStartMs) / 1000;
+    runTimeEl.textContent = formatSec(elapsed);
+    return elapsed;
+  }
 
   function pickClef() {
     const sel = clefSelect.value;
@@ -543,9 +614,22 @@
     answered = false;
     noteButtons.forEach(b => b.classList.remove("correct-flash","wrong-flash"));
     if (currentStep >= sequence.length) {
-      feedbackEl.textContent = "Seqüència completada!";
+      const elapsed = endRoundTimer();
+      let message = "Seqüència completada!";
+      if (elapsed > 0 && sequence.length > 1) {
+        const key = currentConfigKey();
+        const best = getBestTime(key);
+        if (!best || elapsed < best) {
+          setBestTime(key, elapsed);
+          message = `🎉 ${formatSec(elapsed)} — Bé! Estàs millorant!`;
+        } else {
+          message = `Temps: ${formatSec(elapsed)}  (millor: ${formatSec(best)})`;
+        }
+        refreshBestTimeUI();
+      }
+      feedbackEl.textContent = message;
       feedbackEl.className   = "feedback correct";
-      setTimeout(startRound, 1400);
+      setTimeout(startRound, 2200);
     } else {
       feedbackEl.textContent = "";
       feedbackEl.className   = "feedback";
@@ -556,6 +640,9 @@
   function handleAnswer(answerCa, btn) {
     if (answered || currentStep >= sequence.length) return;
     answered = true;
+
+    // Primer click → arrenca cronòmetre
+    if (!roundStartMs && sequence.length > 1) startRoundTimer();
 
     const step          = sequence[currentStep];
     const correctLetter = noteLetter(step.note);
@@ -591,6 +678,11 @@
     feedbackEl.textContent = "";
     feedbackEl.className   = "feedback";
     noteButtons.forEach(b => b.classList.remove("correct-flash","wrong-flash"));
+    roundStartMs = 0;
+    roundEndedMs = 0;
+    if (roundTimerRAF) cancelAnimationFrame(roundTimerRAF);
+    runTimeEl.textContent = "—";
+    refreshBestTimeUI();
     render();
   }
 
