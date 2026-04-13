@@ -514,8 +514,11 @@
 
     const containerWidth = Math.max(400, container.clientWidth);
     const height         = 460;
-    const staveWidth     = Math.min(340, containerWidth - 40);
-    const staveX         = Math.round((containerWidth - staveWidth) / 2);
+    // Pentagrama estret amb clef + nota. La nota es col·loca al centre del container.
+    const staveWidth     = 180;
+    const clefApproxW    = 45;
+    // staveX calculat perquè la nota (al tick 0 del voice) acabi al centre exacte del SVG
+    const staveX         = Math.round(containerWidth / 2 - clefApproxW);
     const trebleY        = 140;
     const bassY          = 280;
 
@@ -558,15 +561,13 @@
     const trebleNote = buildStaveNote("treble", trebleInfos);
     const bassNote   = buildStaveNote("bass",   bassInfos);
 
-    const trebleElements = [new VF.GhostNote({ duration: "w" }), trebleNote];
-    const bassElements   = [new VF.GhostNote({ duration: "w" }), bassNote];
+    const tv = new VF.Voice({ num_beats: 4, beat_value: 4 }).addTickables([trebleNote]);
+    const bv = new VF.Voice({ num_beats: 4, beat_value: 4 }).addTickables([bassNote]);
 
-    const tv = new VF.Voice({ num_beats: 8, beat_value: 4 }).addTickables(trebleElements);
-    const bv = new VF.Voice({ num_beats: 8, beat_value: 4 }).addTickables(bassElements);
-
+    // Format width petit: la nota s'ancora just després del clef
     new VF.Formatter()
       .joinVoices([tv, bv])
-      .format([tv, bv], Math.max(150, staveWidth - 60));
+      .format([tv, bv], 40);
 
     tv.draw(context, trebleStave);
     bv.draw(context, bassStave);
