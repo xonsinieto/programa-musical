@@ -1585,6 +1585,7 @@
   const spFeedbackEl   = document.getElementById("sp-feedback");
   const spCorrectEl    = document.getElementById("sp-correct");
   const spWrongEl      = document.getElementById("sp-wrong");
+  const spBestEl       = document.getElementById("sp-best");
   const spNoteButtons  = document.querySelectorAll(".sp-note-btn");
 
   const SP_MAX_SPEED = 10;
@@ -1613,6 +1614,32 @@
   let spStreak  = 0;
   let spCorrect = 0;
   let spWrong   = 0;
+  let spMaxSpeedThisRun = 1;
+
+  // Highscores per perfil + clef + level
+  const SP_HIGHSCORES_KEY = "velocitatHighScores_v1";
+  function loadSpScores() {
+    try { return JSON.parse(localStorage.getItem(SP_HIGHSCORES_KEY) || "{}"); }
+    catch (e) { return {}; }
+  }
+  function saveSpScores(s) {
+    try { localStorage.setItem(SP_HIGHSCORES_KEY, JSON.stringify(s)); } catch (e) {}
+  }
+  function spConfigKey() {
+    return spClefSelect.value + "|" + spLevelSelect.value;
+  }
+  function getSpBest() {
+    const all = loadSpScores();
+    const profile = currentProfile();
+    return (all[profile] && all[profile][spConfigKey()]) || null;
+  }
+  function setSpBest(record) {
+    const all = loadSpScores();
+    const profile = currentProfile();
+    if (!all[profile]) all[profile] = {};
+    all[profile][spConfigKey()] = record;
+    saveSpScores(all);
+  }
 
   function spPickClef() {
     const sel = spClefSelect.value;
@@ -1640,6 +1667,10 @@
     spSpeedLevelEl.textContent = spCurrentSpeed;
     spStreakEl.textContent     = spStreak;
     spSpeedSelect.value        = String(spCurrentSpeed);
+    const best = getSpBest();
+    spBestEl.textContent = best
+      ? best.notes + " (vel " + best.speed + ")"
+      : "—";
   }
 
   function spShowOverlay(panel) {
@@ -1877,7 +1908,25 @@
     failedNote.el.appendChild(label);
 
     spFailNameEl.textContent = name;
+
+    // Sistema de puntuació per perfil + clef + level
+    const prevBest = getSpBest();
+    const newRecord = !prevBest || spCorrect > prevBest.notes;
+    if (spCorrect > 0 && newRecord) {
+      setSpBest({ notes: spCorrect, speed: spMaxSpeedThisRun });
+      playCongratulations();
+    }
+    spUpdateStats();
+
+    // Mostra info al retry bar
+    if (newRecord && spCorrect > 0) {
+      spFailNameEl.insertAdjacentHTML &&
+        (document.getElementById("sp-fail-name").textContent = name + " — 🏆 Nou rècord! " + spCorrect + " notes");
+    } else if (prevBest) {
+      document.getElementById("sp-fail-name").textContent = name + " — " + spCorrect + " notes (millor: " + prevBest.notes + ")";
+    }
     spRetryBar.classList.remove("hidden");
+
     setTimeout(() => {
       spNoteButtons.forEach(b => b.classList.remove("correct-flash","wrong-flash"));
     }, 200);
@@ -1890,6 +1939,7 @@
     }
     const passed = spCurrentSpeed;
     spCurrentSpeed++;
+    if (spCurrentSpeed > spMaxSpeedThisRun) spMaxSpeedThisRun = spCurrentSpeed;
     spStreak = 0;
     spState = "levelup";
     if (spRAF) cancelAnimationFrame(spRAF);
@@ -1923,6 +1973,7 @@
   function spStart() {
     spRunning = true;
     spCurrentSpeed = 1;
+    spMaxSpeedThisRun = 1;
     spStreak = 0;
     spCorrect = 0;
     spWrong = 0;
@@ -1947,6 +1998,9 @@
     spUpdateStats();
     spShowOverlay(spOvStart);
   }
+
+  spClefSelect.addEventListener("change", spUpdateStats);
+  spLevelSelect.addEventListener("change", spUpdateStats);
 
   spStartBtn.addEventListener("click", spStart);
   spRetryBtn.addEventListener("click", spRetry);
