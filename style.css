@@ -373,10 +373,22 @@ nav.tabs .tab.active {
 
 @media (max-width: 600px) {
   .fc-buttons {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 8px;
+    margin-top: 4px;
+  }
+  .fc-buttons .big-btn {
+    padding: 10px 4px;
+    font-size: 0.85rem;
+    border-radius: 8px;
+    box-shadow: none;
+    line-height: 1.1;
   }
   .fc-answer {
-    font-size: 1.8rem;
+    font-size: 1.6rem;
+    min-height: 36px;
+    margin: 6px 0;
   }
 }
 
