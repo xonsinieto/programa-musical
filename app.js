@@ -1626,18 +1626,20 @@
     try { localStorage.setItem(SP_HIGHSCORES_KEY, JSON.stringify(s)); } catch (e) {}
   }
   function spConfigKey() {
-    return spClefSelect.value + "|" + spLevelSelect.value;
+    // Inclou velocitat actual → record per cada velocitat
+    return spClefSelect.value + "|" + spLevelSelect.value + "|v" + spCurrentSpeed;
   }
   function getSpBest() {
     const all = loadSpScores();
     const profile = currentProfile();
-    return (all[profile] && all[profile][spConfigKey()]) || null;
+    const v = (all[profile] && all[profile][spConfigKey()]);
+    return typeof v === "number" ? v : 0;
   }
-  function setSpBest(record) {
+  function setSpBest(notes) {
     const all = loadSpScores();
     const profile = currentProfile();
     if (!all[profile]) all[profile] = {};
-    all[profile][spConfigKey()] = record;
+    all[profile][spConfigKey()] = notes;
     saveSpScores(all);
   }
 
@@ -1668,9 +1670,7 @@
     spStreakEl.textContent     = spStreak;
     spSpeedSelect.value        = String(spCurrentSpeed);
     const best = getSpBest();
-    spBestEl.textContent = best
-      ? best.notes + " (vel " + best.speed + ")"
-      : "—";
+    spBestEl.textContent = best > 0 ? (best + "/" + SP_STREAK_TO_ADVANCE) : "—";
   }
 
   function spShowOverlay(panel) {
@@ -1909,22 +1909,27 @@
 
     spFailNameEl.textContent = name;
 
-    // Sistema de puntuació per perfil + clef + level
+    // Record per la velocitat actual: spCorrect (notes acertades en aquest intent)
     const prevBest = getSpBest();
-    const newRecord = !prevBest || spCorrect > prevBest.notes;
-    if (spCorrect > 0 && newRecord) {
-      setSpBest({ notes: spCorrect, speed: spMaxSpeedThisRun });
+    const isImprovement = spCorrect > prevBest;
+    const isTie = spCorrect > 0 && spCorrect === prevBest;
+    if (spCorrect > 0 && isImprovement) {
+      setSpBest(spCorrect);
       playCongratulations();
+    } else if (isTie) {
+      playEncouragement();
     }
     spUpdateStats();
 
-    // Mostra info al retry bar
-    if (newRecord && spCorrect > 0) {
-      spFailNameEl.insertAdjacentHTML &&
-        (document.getElementById("sp-fail-name").textContent = name + " — 🏆 Nou rècord! " + spCorrect + " notes");
-    } else if (prevBest) {
-      document.getElementById("sp-fail-name").textContent = name + " — " + spCorrect + " notes (millor: " + prevBest.notes + ")";
+    let extra = "";
+    if (spCorrect > 0 && isImprovement) {
+      extra = " — 🏆 Nou rècord vel " + spCurrentSpeed + ": " + spCorrect + "/" + SP_STREAK_TO_ADVANCE;
+    } else if (isTie) {
+      extra = " — 👍 Empat (" + spCorrect + "/" + SP_STREAK_TO_ADVANCE + ")";
+    } else if (prevBest > 0) {
+      extra = " — " + spCorrect + " (millor vel " + spCurrentSpeed + ": " + prevBest + ")";
     }
+    document.getElementById("sp-fail-name").textContent = name + extra;
     spRetryBar.classList.remove("hidden");
 
     setTimeout(() => {
@@ -1937,10 +1942,17 @@
       spWin();
       return;
     }
+    // Abans de pujar de nivell, guardem el record (30/30) per la velocitat actual
+    const prevBestForLevel = getSpBest();
+    if (spCorrect > prevBestForLevel) setSpBest(spCorrect);
+
     const passed = spCurrentSpeed;
     spCurrentSpeed++;
     if (spCurrentSpeed > spMaxSpeedThisRun) spMaxSpeedThisRun = spCurrentSpeed;
+    // Reset comptadors per la velocitat nova (cada velocitat té el seu record)
     spStreak = 0;
+    spCorrect = 0;
+    spWrong = 0;
     spState = "levelup";
     if (spRAF) cancelAnimationFrame(spRAF);
     spLvlUpTitle.textContent = `Velocitat ${passed} superada!`;
