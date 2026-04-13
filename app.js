@@ -153,6 +153,41 @@
     3: null // serà RANGES complet
   };
 
+  // ---------- ESTADÍSTIQUES PER NOTA ----------
+  const TRAIN_STATS_KEY = "trainNoteStats_v1";
+
+  function loadTrainStats() {
+    try { return JSON.parse(localStorage.getItem(TRAIN_STATS_KEY) || "{}"); }
+    catch (e) { return {}; }
+  }
+  function saveTrainStats(s) {
+    try { localStorage.setItem(TRAIN_STATS_KEY, JSON.stringify(s)); } catch (e) {}
+  }
+  function recordTrainAnswer(clef, note, isCorrect) {
+    const s = loadTrainStats();
+    const k = clef + "|" + note;
+    if (!s[k]) s[k] = { correct: 0, wrong: 0 };
+    if (isCorrect) s[k].correct++; else s[k].wrong++;
+    saveTrainStats(s);
+  }
+  function pickFailedNote() {
+    const s = loadTrainStats();
+    const entries = Object.keys(s)
+      .map(k => {
+        const [clef, note] = k.split("|");
+        const v = s[k];
+        const total = v.correct + v.wrong;
+        const rate = total > 0 ? v.wrong / total : 0;
+        return { clef, note, rate, wrong: v.wrong, total };
+      })
+      .filter(e => e.wrong > 0 && e.total >= 2)
+      .sort((a, b) => (b.rate - a.rate) || (b.wrong - a.wrong));
+
+    const top = entries.slice(0, 12);
+    if (top.length === 0) return null;
+    return top[Math.floor(Math.random() * top.length)];
+  }
+
   function pickNoteForLevel(clef, level) {
     const lvl = parseInt(level, 10) || 3;
     const pool = (lvl === 3 || !LEVELS[lvl]) ? RANGES[clef] : LEVELS[lvl][clef];
@@ -243,15 +278,30 @@
     if (mode === "single") {
       count = 1;
     } else {
-      // Calcula quantes notes càpiguen segons l'amplada disponible
       const isMobile = window.innerWidth < 600;
       const mult     = isMobile ? 1.72 : 1;
       const renderWidth = Math.max(400, staffContainer.clientWidth) * mult;
-      const usableWidth = renderWidth - 40 /*marges*/ - 60 /*clef*/;
+      const usableWidth = renderWidth - 40 - 60;
       const targetNoteSpace = isMobile ? 50 : 55;
       count = Math.max(4, Math.floor(usableWidth / targetNoteSpace));
     }
     const level = levelSelect.value;
+
+    if (mode === "failed") {
+      // Si no hi ha prou estadístiques, omple amb aleatori
+      for (let i = 0; i < count; i++) {
+        const failed = pickFailedNote();
+        if (failed) {
+          sequence.push({ clef: failed.clef, note: failed.note, status: "pending" });
+        } else {
+          const c = pickClef();
+          sequence.push({ clef: c, note: pickNoteForLevel(c, level), status: "pending" });
+        }
+      }
+      currentStep = 0;
+      return;
+    }
+
     for (let i = 0; i < count; i++) {
       const c = pickClef();
       sequence.push({ clef: c, note: pickNoteForLevel(c, level), status: "pending" });
@@ -405,6 +455,7 @@
       feedbackEl.className   = "feedback correct";
       btn.classList.add("correct-flash");
       playNote(step.note);
+      recordTrainAnswer(step.clef, step.note, true);
       render();
       setTimeout(advance, 600);
     } else {
@@ -414,6 +465,7 @@
       feedbackEl.className   = "feedback wrong";
       btn.classList.add("wrong-flash");
       playErrorSound();
+      recordTrainAnswer(step.clef, step.note, false);
       render();
       setTimeout(advance, 1200);
     }
