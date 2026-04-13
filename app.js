@@ -57,7 +57,6 @@
   const clefSelect     = document.getElementById("clef-select");
   const levelSelect    = document.getElementById("level-select");
   const modeSelect     = document.getElementById("mode-select");
-  const countSelect    = document.getElementById("count-select");
   const newNoteBtn     = document.getElementById("new-note-btn");
   const feedbackEl     = document.getElementById("feedback");
   const correctCountEl = document.getElementById("correct-count");
@@ -84,7 +83,18 @@
 
   function buildSequence() {
     const mode  = modeSelect.value;
-    const count = mode === "single" ? 1 : parseInt(countSelect.value, 10);
+    let count;
+    if (mode === "single") {
+      count = 1;
+    } else {
+      // Calcula quantes notes càpiguen segons l'amplada disponible
+      const isMobile = window.innerWidth < 600;
+      const mult     = isMobile ? 1.72 : 1;
+      const renderWidth = Math.max(400, staffContainer.clientWidth) * mult;
+      const usableWidth = renderWidth - 40 /*marges*/ - 60 /*clef*/;
+      const targetNoteSpace = isMobile ? 50 : 55;
+      count = Math.max(4, Math.floor(usableWidth / targetNoteSpace));
+    }
     sequence    = [];
     const level = levelSelect.value;
     for (let i = 0; i < count; i++) {
@@ -97,7 +107,9 @@
   function render() {
     staffContainer.innerHTML = "";
 
-    const containerWidth = Math.max(400, staffContainer.clientWidth);
+    const isMobile       = window.innerWidth < 600;
+    const mult           = isMobile ? 1.72 : 1;
+    const containerWidth = Math.max(400, staffContainer.clientWidth) * mult;
     const height         = 460;
     const staveX         = 20;
     const staveWidth     = containerWidth - staveX - 20;
@@ -270,7 +282,6 @@
   clefSelect.addEventListener("change", startRound);
   levelSelect.addEventListener("change", startRound);
   modeSelect.addEventListener("change", startRound);
-  countSelect.addEventListener("change", startRound);
 
   window.addEventListener("resize", () => {
     if (document.getElementById("screen-train").classList.contains("active") && sequence.length > 0) {
