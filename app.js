@@ -362,6 +362,7 @@
   let roundEndedMs  = 0;
   let roundTimerRAF = null;
   let roundConfigKey = "";
+  let roundErrors   = 0;
 
   const runTimeEl  = document.getElementById("run-time");
   const bestTimeEl = document.getElementById("best-time");
@@ -617,20 +618,23 @@
       const elapsed = endRoundTimer();
       let message = "Seqüència completada!";
       if (elapsed > 0 && sequence.length > 1) {
+        const cleanRun = roundErrors === 0;
         const key = currentConfigKey();
         const best = getBestTime(key);
         const diff = best ? elapsed - best : null;
-        if (!best || elapsed < best - 0.05) {
-          // Nou rècord
+
+        if (!cleanRun) {
+          // Amb errors: NO compta com a millor, només mostrem temps i info
+          message = `Temps: ${formatSec(elapsed)} — ${roundErrors} error${roundErrors > 1 ? "s" : ""}` +
+                    (best ? `  (millor sense errors: ${formatSec(best)})` : "");
+        } else if (!best || elapsed < best - 0.05) {
           setBestTime(key, elapsed);
           message = `🎉 ${formatSec(elapsed)} — Bé! Estàs millorant!`;
           playCongratulations();
         } else if (diff !== null && Math.abs(diff) <= 0.1) {
-          // Empat (dins 0.1s)
           message = `🎉 ${formatSec(elapsed)} — Empat amb el millor!`;
           playCongratulations();
         } else if (diff !== null && diff <= 3) {
-          // Dins de 3 segons del millor → encoratjament
           message = `👍 ${formatSec(elapsed)} — Bé, segueix així! (millor: ${formatSec(best)})`;
           playEncouragement();
         } else {
@@ -671,6 +675,7 @@
       setTimeout(advance, 600);
     } else {
       wrong++;
+      roundErrors++;
       step.status = "wrong";
       feedbackEl.textContent = `Era ${correctCa.toUpperCase()}`;
       feedbackEl.className   = "feedback wrong";
@@ -691,6 +696,7 @@
     noteButtons.forEach(b => b.classList.remove("correct-flash","wrong-flash"));
     roundStartMs = 0;
     roundEndedMs = 0;
+    roundErrors  = 0;
     if (roundTimerRAF) cancelAnimationFrame(roundTimerRAF);
     runTimeEl.textContent = "—";
     refreshBestTimeUI();
