@@ -1,6 +1,51 @@
 (function () {
   const VF = Vex.Flow;
 
+  const SONGS = [
+    {
+      id: "frere-jacques",
+      name: "Germà Joan",
+      clef: "treble",
+      notes: ["c/4","d/4","e/4","c/4","c/4","d/4","e/4","c/4",
+              "e/4","f/4","g/4","e/4","f/4","g/4"]
+    },
+    {
+      id: "twinkle",
+      name: "Estrelleta on ets",
+      clef: "treble",
+      notes: ["c/4","c/4","g/4","g/4","a/4","a/4","g/4",
+              "f/4","f/4","e/4","e/4","d/4","d/4","c/4"]
+    },
+    {
+      id: "ode-joy",
+      name: "Oda a l'Alegria",
+      clef: "treble",
+      notes: ["e/4","e/4","f/4","g/4","g/4","f/4","e/4","d/4",
+              "c/4","c/4","d/4","e/4","e/4","d/4","d/4"]
+    },
+    {
+      id: "mary-lamb",
+      name: "Mary Had a Little Lamb",
+      clef: "treble",
+      notes: ["e/4","d/4","c/4","d/4","e/4","e/4","e/4",
+              "d/4","d/4","d/4","e/4","g/4","g/4"]
+    },
+    {
+      id: "happy-birthday",
+      name: "Aniversari Feliç",
+      clef: "treble",
+      notes: ["c/4","c/4","d/4","c/4","f/4","e/4",
+              "c/4","c/4","d/4","c/4","g/4","f/4"]
+    },
+    {
+      id: "scale-up",
+      name: "Escala Do Major",
+      clef: "treble",
+      notes: ["c/4","d/4","e/4","f/4","g/4","a/4","b/4","c/5",
+              "c/5","b/4","a/4","g/4","f/4","e/4","d/4","c/4"]
+    }
+  ];
+
   const NOTE_NAMES_CA = {
     c: "do", d: "re", e: "mi", f: "fa", g: "sol", a: "la", b: "si"
   };
@@ -57,6 +102,16 @@
   const clefSelect     = document.getElementById("clef-select");
   const levelSelect    = document.getElementById("level-select");
   const modeSelect     = document.getElementById("mode-select");
+  const songSelect     = document.getElementById("song-select");
+  const songLabel      = document.getElementById("song-label");
+
+  // Omplir el selector de cançons
+  SONGS.forEach((s) => {
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    opt.textContent = s.name;
+    songSelect.appendChild(opt);
+  });
   const newNoteBtn     = document.getElementById("new-note-btn");
   const feedbackEl     = document.getElementById("feedback");
   const correctCountEl = document.getElementById("correct-count");
@@ -83,6 +138,17 @@
 
   function buildSequence() {
     const mode  = modeSelect.value;
+    sequence    = [];
+
+    if (mode === "song") {
+      const song = SONGS.find(s => s.id === songSelect.value) || SONGS[0];
+      song.notes.forEach((note) => {
+        sequence.push({ clef: song.clef, note, status: "pending" });
+      });
+      currentStep = 0;
+      return;
+    }
+
     let count;
     if (mode === "single") {
       count = 1;
@@ -95,7 +161,6 @@
       const targetNoteSpace = isMobile ? 50 : 55;
       count = Math.max(4, Math.floor(usableWidth / targetNoteSpace));
     }
-    sequence    = [];
     const level = levelSelect.value;
     for (let i = 0; i < count; i++) {
       const c = pickClef();
@@ -278,10 +343,19 @@
     btn.addEventListener("click", () => handleAnswer(btn.dataset.note, btn));
   });
 
+  function updateSongVisibility() {
+    songLabel.style.display = modeSelect.value === "song" ? "" : "none";
+  }
+  updateSongVisibility();
+
   newNoteBtn.addEventListener("click", startRound);
   clefSelect.addEventListener("change", startRound);
   levelSelect.addEventListener("change", startRound);
-  modeSelect.addEventListener("change", startRound);
+  modeSelect.addEventListener("change", () => {
+    updateSongVisibility();
+    startRound();
+  });
+  songSelect.addEventListener("change", startRound);
 
   window.addEventListener("resize", () => {
     if (document.getElementById("screen-train").classList.contains("active") && sequence.length > 0) {
