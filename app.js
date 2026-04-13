@@ -619,10 +619,20 @@
       if (elapsed > 0 && sequence.length > 1) {
         const key = currentConfigKey();
         const best = getBestTime(key);
-        if (!best || elapsed < best) {
+        const diff = best ? elapsed - best : null;
+        if (!best || elapsed < best - 0.05) {
+          // Nou rècord
           setBestTime(key, elapsed);
           message = `🎉 ${formatSec(elapsed)} — Bé! Estàs millorant!`;
           playCongratulations();
+        } else if (diff !== null && Math.abs(diff) <= 0.1) {
+          // Empat (dins 0.1s)
+          message = `🎉 ${formatSec(elapsed)} — Empat amb el millor!`;
+          playCongratulations();
+        } else if (diff !== null && diff <= 3) {
+          // Dins de 3 segons del millor → encoratjament
+          message = `👍 ${formatSec(elapsed)} — Bé, segueix així! (millor: ${formatSec(best)})`;
+          playEncouragement();
         } else {
           message = `Temps: ${formatSec(elapsed)}  (millor: ${formatSec(best)})`;
         }
@@ -1121,11 +1131,17 @@
   }
 
   function playCongratulations() {
-    // Arpegi ascendent C-E-G-C alegre amb el so de piano
+    // Arpegi ascendent C-E-G-C alegre amb el so de piano (rècord superat)
     const notes = ["c/5", "e/5", "g/5", "c/6"];
     notes.forEach((n, i) => {
       setTimeout(() => playNote(n), i * 130);
     });
+  }
+
+  function playEncouragement() {
+    // Encoratjament petit: 2 notes (no tan gratificant com el rècord)
+    setTimeout(() => playNote("e/5"), 0);
+    setTimeout(() => playNote("g/5"), 150);
   }
 
   function playErrorSound() {
