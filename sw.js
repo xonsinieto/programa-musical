@@ -1,11 +1,13 @@
-const CACHE = "lectura-notes-v7";
+const CACHE = "lectura-notes-v8";
 const FILES = [
   "./",
   "./index.html",
   "./style.css",
   "./app.js",
   "./manifest.json",
-  "./icon.svg"
+  "./icon.svg",
+  "./icon-192.png",
+  "./icon-512.png"
 ];
 
 self.addEventListener("install", (event) => {
