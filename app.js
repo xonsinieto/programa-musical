@@ -142,15 +142,18 @@
   };
   const LEVELS = {
     1: {
-      // Una octava des del Do fins al Do següent (més senzill per començar)
+      // Una octava: Do central fins al Do següent (Sol cap a la dreta, Fa cap a l'esquerra)
       treble: ["c/4","d/4","e/4","f/4","g/4","a/4","b/4","c/5"],
       bass:   ["c/3","d/3","e/3","f/3","g/3","a/3","b/3","c/4"]
     },
     2: {
-      treble: ["c/4","d/4","e/4","f/4","g/4","a/4","b/4","c/5","d/5","e/5","f/5","g/5","a/5"],
-      bass:   ["e/2","f/2","g/2","a/2","b/2","c/3","d/3","e/3","f/3","g/3","a/3","b/3","c/4"]
+      // Dues octaves: tres Do per clau (c/4, c/5, c/6 Sol; c/2, c/3, c/4 Fa)
+      treble: ["c/4","d/4","e/4","f/4","g/4","a/4","b/4",
+               "c/5","d/5","e/5","f/5","g/5","a/5","b/5","c/6"],
+      bass:   ["c/2","d/2","e/2","f/2","g/2","a/2","b/2",
+               "c/3","d/3","e/3","f/3","g/3","a/3","b/3","c/4"]
     },
-    3: null // serà RANGES complet
+    3: null // tot el piano (rang RANGES complet)
   };
 
   // ---------- PERFILS + ESTADÍSTIQUES PER NOTA ----------
