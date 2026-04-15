@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.3/build/cjs/vexflow.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 </head>
 <body>
   <header>
@@ -69,6 +70,8 @@
           <select id="song-select"></select>
         </label>
         <button id="new-note-btn">Nova</button>
+        <button id="xml-load-btn" type="button" title="Carregar partitura MusicXML">📄 Partitura</button>
+        <input type="file" id="xml-file-input" accept=".xml,.musicxml,.mxl" style="display:none">
         <button id="mic-btn" type="button">🎹 So</button>
         <span id="mic-status" class="mic-status"></span>
       </div>

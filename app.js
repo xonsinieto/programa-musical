@@ -710,6 +710,139 @@
     btn.addEventListener("click", () => handleAnswer(btn.dataset.note, btn));
   });
 
+  // ---------- CÀRREGA MUSICXML ----------
+  const TYPE_TO_DUR = {
+    whole:   "w",
+    half:    "h",
+    quarter: "q",
+    eighth:  "8",
+    "16th":  "16",
+    "32nd":  "16"
+  };
+
+  function parseMusicXML(xmlText) {
+    const doc = new DOMParser().parseFromString(xmlText, "text/xml");
+    const parseErr = doc.querySelector("parsererror");
+    if (parseErr) throw new Error("Error analitzant l'XML de la partitura");
+
+    const result = [];
+    const noteEls = doc.getElementsByTagName("note");
+
+    for (let i = 0; i < noteEls.length; i++) {
+      const noteEl = noteEls[i];
+      // Saltem silencis, acords (repeticions de nota al mateix temps), gràcies
+      if (noteEl.getElementsByTagName("rest").length > 0) continue;
+      if (noteEl.getElementsByTagName("chord").length > 0) continue;
+      if (noteEl.getElementsByTagName("grace").length > 0) continue;
+
+      const pitchEl = noteEl.getElementsByTagName("pitch")[0];
+      if (!pitchEl) continue;
+
+      const step = (pitchEl.getElementsByTagName("step")[0]?.textContent || "").toLowerCase();
+      const octave = pitchEl.getElementsByTagName("octave")[0]?.textContent;
+      if (!step || !octave) continue;
+
+      // Saltem notes amb alteració (sostinguts/bemolls) — no els suportem al sistema
+      const alter = pitchEl.getElementsByTagName("alter")[0]?.textContent;
+      if (alter && parseInt(alter, 10) !== 0) continue;
+
+      const type = noteEl.getElementsByTagName("type")[0]?.textContent;
+      const dur = TYPE_TO_DUR[type] || "q";
+
+      // Determina clau pel staff (1=treble, 2=bass en piano)
+      const staff = noteEl.getElementsByTagName("staff")[0]?.textContent;
+      const clef = staff === "2" ? "bass" : "treble";
+
+      result.push({ clef, note: step + "/" + octave, dur });
+    }
+
+    return result;
+  }
+
+  async function loadMusicXmlFile(file) {
+    let xmlText;
+    const name = file.name.toLowerCase();
+
+    if (name.endsWith(".mxl")) {
+      // Comprimit: descomprimim amb JSZip
+      if (typeof JSZip === "undefined") {
+        alert("No s'ha pogut carregar JSZip (necessari per .mxl)");
+        return null;
+      }
+      const buf = await file.arrayBuffer();
+      const zip = await JSZip.loadAsync(buf);
+      // Busca la ruta del fitxer principal via META-INF/container.xml
+      let rootPath = null;
+      const containerFile = zip.file("META-INF/container.xml");
+      if (containerFile) {
+        const ctext = await containerFile.async("string");
+        const cdoc = new DOMParser().parseFromString(ctext, "text/xml");
+        const rf = cdoc.querySelector("rootfile");
+        if (rf) rootPath = rf.getAttribute("full-path");
+      }
+      if (!rootPath) {
+        // fallback: primer .xml/.musicxml
+        const names = Object.keys(zip.files).filter(n => !zip.files[n].dir && /\.(xml|musicxml)$/i.test(n));
+        rootPath = names[0];
+      }
+      if (!rootPath) throw new Error("Fitxer .mxl sense XML vàlid");
+      xmlText = await zip.file(rootPath).async("string");
+    } else {
+      xmlText = await file.text();
+    }
+
+    return parseMusicXML(xmlText);
+  }
+
+  const xmlLoadBtn   = document.getElementById("xml-load-btn");
+  const xmlFileInput = document.getElementById("xml-file-input");
+
+  xmlLoadBtn.addEventListener("click", () => xmlFileInput.click());
+
+  xmlFileInput.addEventListener("change", async (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    try {
+      const notes = await loadMusicXmlFile(file);
+      if (!notes || notes.length === 0) {
+        alert("No s'han trobat notes vàlides a aquesta partitura.\n" +
+              "(Les notes amb sostinguts/bemolls es salten — el sistema només suporta notes naturals.)");
+        xmlFileInput.value = "";
+        return;
+      }
+      // Crea una cançó personalitzada temporal
+      const id = "custom-" + Date.now();
+      const songName = file.name.replace(/\.(xml|musicxml|mxl)$/i, "");
+      const song = { id, name: "📄 " + songName, notes };
+
+      // Elimina cançons custom anteriors (evita duplicats)
+      for (let i = SONGS.length - 1; i >= 0; i--) {
+        if (SONGS[i].id.startsWith("custom-")) SONGS.splice(i, 1);
+      }
+      SONGS.push(song);
+
+      // Refresca el selector de cançons
+      songSelect.innerHTML = "";
+      SONGS.forEach(s => {
+        const o = document.createElement("option");
+        o.value = s.id;
+        o.textContent = s.name;
+        songSelect.appendChild(o);
+      });
+      songSelect.value = id;
+
+      // Activa el mode cançó i inicia
+      modeSelect.value = "song";
+      updateSongVisibility();
+      startRound();
+
+      alert(`Partitura "${songName}" carregada: ${notes.length} notes.`);
+    } catch (e) {
+      alert("Error carregant la partitura: " + (e.message || e));
+    }
+    xmlFileInput.value = "";
+  });
+
   function updateSongVisibility() {
     songLabel.style.display = modeSelect.value === "song" ? "" : "none";
   }
