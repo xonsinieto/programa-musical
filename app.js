@@ -1289,9 +1289,9 @@
     if (document.getElementById("screen-reference").classList.contains("active")) {
       renderReference();
     }
-    const srScreen = document.getElementById("screen-sightread");
-    if (srScreen && srScreen.classList.contains("active")) {
-      srRender();
+    const rlScreen = document.getElementById("screen-sightread");
+    if (rlScreen && rlScreen.classList.contains("active") && typeof rlRender === "function") {
+      rlRender();
     }
     if (document.getElementById("screen-speed").classList.contains("active") && spRunning) {
       spBuildStage();
@@ -1808,337 +1808,692 @@
     bv.draw(context, bassStave);
   }
 
-  // ---------- LECTURA PRO (sight-read trainer) ----------
-  const srLevelEl    = document.getElementById("sr-level");
-  const srDurationEl = document.getElementById("sr-duration");
-  const srStartBtn   = document.getElementById("sr-start-btn");
-  const srStopBtn    = document.getElementById("sr-stop-btn");
-  const srContainer  = document.getElementById("sr-staff-container");
-  const srFeedbackEl = document.getElementById("sr-feedback");
-  const srTimeEl     = document.getElementById("sr-time");
-  const srCountEl    = document.getElementById("sr-count");
-  const srNpmEl      = document.getElementById("sr-npm");
-  const srAccEl      = document.getElementById("sr-acc");
-  const srBestEl     = document.getElementById("sr-best");
-  const srNoteButtons = document.querySelectorAll(".sr-note-btn");
+  // ---------- PENTAGRAMA RELÀMPEC (puzzle diari estil Wordle) ----------
+  const rlLevelEl     = document.getElementById("rl-level");
+  const rlModeEl      = document.getElementById("rl-mode");
+  const rlStartBtn    = document.getElementById("rl-start-btn");
+  const rlRevealBtn   = document.getElementById("rl-reveal-btn");
+  const rlCountdownEl = document.getElementById("rl-countdown");
+  const rlCountdownTimeEl = document.getElementById("rl-countdown-time");
+  const rlStaffEl     = document.getElementById("rl-staff-container");
+  const rlCurrentNoteEl = document.getElementById("rl-current-note");
+  const rlAttemptsEl  = document.getElementById("rl-attempts");
+  const rlFeedbackEl  = document.getElementById("rl-feedback");
+  const rlNoteButtons = document.querySelectorAll(".rl-note-btn");
+  const rlPuzzleNumEl = document.getElementById("rl-puzzle-num");
+  const rlDateEl      = document.getElementById("rl-date");
+  const rlStreakNumEl = document.getElementById("rl-streak-num");
+  const rlPlayedEl    = document.getElementById("rl-played");
+  const rlWonEl       = document.getElementById("rl-won");
+  const rlWinrateEl   = document.getElementById("rl-winrate");
+  const rlBestStreakEl = document.getElementById("rl-best-streak");
+  const rlResultModal = document.getElementById("rl-result-modal");
+  const rlResultBadge = document.getElementById("rl-result-badge");
+  const rlResultTitle = document.getElementById("rl-result-title");
+  const rlResultSub   = document.getElementById("rl-result-sub");
+  const rlResultGrid  = document.getElementById("rl-result-grid");
+  const rlResultStreakNum = document.getElementById("rl-result-streak-num");
+  const rlDistRowsEl  = document.getElementById("rl-dist-rows");
+  const rlShareBtn    = document.getElementById("rl-share-btn");
+  const rlFreeBtn     = document.getElementById("rl-free-btn");
+  const rlResultCountdown = document.getElementById("rl-result-countdown");
 
-  const SR_BATCH_SIZE = 20;
-  const SR_WEIGHTS_KEY = "srWeightsByProfile_v1";
-  const SR_BEST_KEY = "srBestByProfile_v1";
+  const RL_STATE_KEY    = "rlState_v1";
+  const RL_EPOCH        = Date.UTC(2026, 0, 1); // 2026-01-01 = Relàmpec #1
+  const RL_MAX_ATTEMPTS = 3;
+  const RL_FAST_MS      = 1500;   // <1.5s → 🟩
+  const RL_SLOW_MS      = 4000;   // >4s → 🟨 per defecte encara que sigui correcte (massa lent)
 
-  let srState = "idle"; // idle | playing | complete
-  let srBatch = [];
-  let srIdx = 0;
-  let srCorrect = 0;
-  let srTotalAnswers = 0;
-  let srErrorsOnCurrent = 0;
-  let srStartTime = 0;
-  let srTimerInterval = null;
-  let srDurationMs = 120000;
-  let srNoteStartTime = 0;
+  const RL_LEVELS = {
+    1: { label: "L1 · Principiant", notes: 6,  clefs: ["treble"],           pool: ["c/4","d/4","e/4","f/4","g/4","a/4","b/4","c/5"] },
+    2: { label: "L2 · Bàsic",       notes: 8,  clefs: ["treble"],           pool: ["c/4","d/4","e/4","f/4","g/4","a/4","b/4","c/5","d/5","e/5","f/5","g/5"] },
+    3: { label: "L3 · Intermedi",   notes: 10, clefs: ["treble","bass"],    poolTreble: ["c/4","d/4","e/4","f/4","g/4","a/4","b/4","c/5","d/5","e/5","f/5","g/5"],
+                                                                            poolBass:   ["e/2","f/2","g/2","a/2","b/2","c/3","d/3","e/3","f/3","g/3","a/3","b/3","c/4"] },
+    4: { label: "L4 · Avançat",     notes: 12, clefs: ["treble","bass"],    poolTreble: ["a/3","b/3","c/4","d/4","e/4","f/4","g/4","a/4","b/4","c/5","d/5","e/5","f/5","g/5","a/5","b/5","c/6"],
+                                                                            poolBass:   ["c/2","d/2","e/2","f/2","g/2","a/2","b/2","c/3","d/3","e/3","f/3","g/3","a/3","b/3","c/4","d/4","e/4"] },
+    5: { label: "L5 · Pro",         notes: 16, clefs: ["treble","bass"],    poolTreble: null, poolBass: null } // usa RANGES complet
+  };
 
-  function srLoadWeights() {
-    try { return JSON.parse(localStorage.getItem(SR_WEIGHTS_KEY) || "{}"); } catch (e) { return {}; }
+  // --- Mulberry32 PRNG (determinista per llavor numèrica) ---
+  function rlMulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
   }
-  function srSaveWeights(all) {
-    try { localStorage.setItem(SR_WEIGHTS_KEY, JSON.stringify(all)); } catch (e) {}
+  function rlSeedForDate(d, level) {
+    const y = d.getUTCFullYear();
+    const m = d.getUTCMonth() + 1;
+    const day = d.getUTCDate();
+    return (y * 10000 + m * 100 + day) * 7 + level * 97;
   }
-  function srGetProfileWeights() {
-    const all = srLoadWeights();
-    return all[currentProfile()] || {};
+  function rlPuzzleNumForDate(d) {
+    const today = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    return Math.floor((today - RL_EPOCH) / 86400000) + 1;
   }
-  function srSaveProfileWeights(w) {
-    const all = srLoadWeights();
-    all[currentProfile()] = w;
-    srSaveWeights(all);
+  function rlToday() { return new Date(); }
+  function rlFormatDateCat(d) {
+    const months = ["gen","feb","mar","abr","mai","jun","jul","ago","set","oct","nov","des"];
+    return d.getDate() + " " + months[d.getMonth()] + " " + d.getFullYear();
   }
+  function rlDateKey(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+  }
+  function rlPickFrom(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
 
-  function srLoadBest() {
-    try { return JSON.parse(localStorage.getItem(SR_BEST_KEY) || "{}"); } catch (e) { return {}; }
-  }
-  function srSaveBest(all) {
-    try { localStorage.setItem(SR_BEST_KEY, JSON.stringify(all)); } catch (e) {}
-  }
-  function srGetBest() {
-    const all = srLoadBest();
-    const profileBest = all[currentProfile()] || {};
-    return profileBest[srLevelEl.value] || 0;
-  }
-  function srSetBest(npm) {
-    const all = srLoadBest();
-    if (!all[currentProfile()]) all[currentProfile()] = {};
-    all[currentProfile()][srLevelEl.value] = npm;
-    srSaveBest(all);
-  }
-
-  function srGetRange() {
-    const lvl = parseInt(srLevelEl.value, 10);
-    if (lvl === 1) {
-      return [
-        ...LEVELS[1].treble.map(n => ({ clef: "treble", note: n })),
-        ...LEVELS[1].bass.map(n => ({ clef: "bass", note: n })),
-      ];
-    }
-    if (lvl === 2) {
-      return [
-        ...LEVELS[2].treble.map(n => ({ clef: "treble", note: n })),
-        ...LEVELS[2].bass.map(n => ({ clef: "bass", note: n })),
-      ];
-    }
-    return [
-      ...RANGES.treble.map(n => ({ clef: "treble", note: n })),
-      ...RANGES.bass.map(n => ({ clef: "bass", note: n })),
-    ];
-  }
-
-  function srWeightKey(entry) { return entry.clef + "|" + entry.note; }
-
-  function srBuildBatch() {
-    const range = srGetRange();
-    const weights = srGetProfileWeights();
-    const batch = [];
-    for (let i = 0; i < SR_BATCH_SIZE; i++) {
-      let totalWeight = 0;
-      for (const e of range) totalWeight += Math.max(1, weights[srWeightKey(e)] || 1);
-      let r = Math.random() * totalWeight;
-      for (const e of range) {
-        r -= Math.max(1, weights[srWeightKey(e)] || 1);
-        if (r <= 0) { batch.push({ clef: e.clef, note: e.note }); break; }
+  function rlGeneratePuzzle(level, rng) {
+    const cfg = RL_LEVELS[level];
+    const notes = [];
+    let lastKey = null;
+    for (let i = 0; i < cfg.notes; i++) {
+      let clef, poolArr;
+      if (cfg.clefs.length === 1) {
+        clef = cfg.clefs[0];
+        poolArr = cfg.pool;
+      } else {
+        clef = cfg.clefs[Math.floor(rng() * cfg.clefs.length)];
+        if (level === 5) {
+          poolArr = RANGES[clef];
+        } else {
+          poolArr = clef === "treble" ? cfg.poolTreble : cfg.poolBass;
+        }
       }
+      let n = rlPickFrom(rng, poolArr);
+      // evita la mateixa nota consecutiva (una mica més musical)
+      let tries = 0;
+      while (n === lastKey && tries < 4) { n = rlPickFrom(rng, poolArr); tries++; }
+      lastKey = n;
+      notes.push({ clef, note: n });
     }
-    return batch;
+    return notes;
   }
 
-  // Algoritme de spaced repetition simple:
-  // correct ràpid (<1.5s) → weight-- (menys prioritat)
-  // correct lent (>3s) → weight+
-  // incorrecte → weight += 2 (prioritat alta)
-  function srUpdateWeight(entry, correct, timeMs) {
-    const weights = srGetProfileWeights();
-    const k = srWeightKey(entry);
-    let w = weights[k] || 2;
-    if (!correct) {
-      w = Math.min(20, w + 3);
-    } else if (timeMs < 1500) {
-      w = Math.max(1, w - 1);
-    } else if (timeMs > 3000) {
-      w = Math.min(20, w + 1);
+  // --- Estat persistent ---
+  function rlLoadAll() {
+    try { return JSON.parse(localStorage.getItem(RL_STATE_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function rlSaveAll(all) {
+    try { localStorage.setItem(RL_STATE_KEY, JSON.stringify(all)); } catch (e) {}
+  }
+  function rlGetProfileState() {
+    const all = rlLoadAll();
+    const p = currentProfile();
+    if (!all[p]) all[p] = { byLevel: {}, preferences: { mode: "daily" } };
+    if (!all[p].byLevel) all[p].byLevel = {};
+    if (!all[p].preferences) all[p].preferences = { mode: "daily" };
+    return all[p];
+  }
+  function rlSaveProfileState(state) {
+    const all = rlLoadAll();
+    all[currentProfile()] = state;
+    rlSaveAll(all);
+  }
+  function rlGetLevelStats(level) {
+    const st = rlGetProfileState();
+    if (!st.byLevel[level]) {
+      st.byLevel[level] = {
+        played: 0,
+        won: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        distribution: { "1": 0, "2": 0, "3": 0, "X": 0 },
+        lastPuzzleNum: 0,
+        lastPuzzleDone: null,
+        lastPlayDate: null
+      };
+      rlSaveProfileState(st);
     }
-    weights[k] = w;
-    srSaveProfileWeights(weights);
+    return st.byLevel[level];
+  }
+  function rlSetLevelStats(level, stats) {
+    const st = rlGetProfileState();
+    st.byLevel[level] = stats;
+    rlSaveProfileState(st);
   }
 
-  function srRender() {
-    srContainer.innerHTML = "";
-    if (srBatch.length === 0) return;
+  // --- Estat en memòria del joc actual ---
+  let rlGame = null;
+  // rlGame = {
+  //   mode: "daily" | "free",
+  //   level: 1-5,
+  //   puzzleNum: int,
+  //   notes: [{clef, note}],
+  //   attempts: [[emoji...], ...],      // històric intents completats
+  //   currentAttempt: [emoji...],       // en curs
+  //   noteIdx: 0,
+  //   noteStart: ms,
+  //   state: "idle" | "playing" | "won" | "lost" | "revealed",
+  // }
 
-    const containerWidth = Math.max(400, srContainer.clientWidth);
-    const height = 360;
-    const staveX = 20;
-    const staveWidth = containerWidth - staveX - 20;
-    const trebleY = 100;
-    const bassY = 220;
+  function rlNewGame(mode, level) {
+    const cfg = RL_LEVELS[level];
+    let rng, puzzleNum;
+    if (mode === "daily") {
+      const d = rlToday();
+      rng = rlMulberry32(rlSeedForDate(d, level));
+      puzzleNum = rlPuzzleNumForDate(d);
+    } else {
+      rng = rlMulberry32(((Date.now() >>> 0) ^ (level * 1313)) >>> 0);
+      puzzleNum = 0;
+    }
+    const notes = rlGeneratePuzzle(level, rng);
+    rlGame = {
+      mode, level, puzzleNum, notes,
+      attempts: [], currentAttempt: [],
+      noteIdx: 0, noteStart: 0,
+      state: "idle"
+    };
+    return rlGame;
+  }
 
-    const renderer = new VF.Renderer(srContainer, VF.Renderer.Backends.SVG);
+  // --- VexFlow rendering ---
+  function rlRender() {
+    rlStaffEl.innerHTML = "";
+    if (!rlGame) return;
+
+    const cfg = RL_LEVELS[rlGame.level];
+    const grandStaff = cfg.clefs.length === 2;
+    const containerWidth = Math.max(400, rlStaffEl.clientWidth || 800);
+    const height = grandStaff ? 300 : 180;
+    const staveX = 16;
+    const staveWidth = containerWidth - staveX - 16;
+    const trebleY = 40;
+    const bassY = 160;
+
+    const renderer = new VF.Renderer(rlStaffEl, VF.Renderer.Backends.SVG);
     renderer.resize(containerWidth, height);
     const context = renderer.getContext();
 
     const trebleStave = new VF.Stave(staveX, trebleY, staveWidth);
     trebleStave.addClef("treble").setContext(context).draw();
-    const bassStave = new VF.Stave(staveX, bassY, staveWidth);
-    bassStave.addClef("bass").setContext(context).draw();
+    let bassStave = null;
+    if (grandStaff) {
+      bassStave = new VF.Stave(staveX, bassY, staveWidth);
+      bassStave.addClef("bass").setContext(context).draw();
+      const ct = VF.StaveConnector.type;
+      new VF.StaveConnector(trebleStave, bassStave).setType(ct.BRACE).setContext(context).draw();
+      new VF.StaveConnector(trebleStave, bassStave).setType(ct.SINGLE_LEFT).setContext(context).draw();
+      new VF.StaveConnector(trebleStave, bassStave).setType(ct.SINGLE_RIGHT).setContext(context).draw();
+    }
 
-    const ct = VF.StaveConnector.type;
-    new VF.StaveConnector(trebleStave, bassStave).setType(ct.BRACE).setContext(context).draw();
-    new VF.StaveConnector(trebleStave, bassStave).setType(ct.SINGLE_LEFT).setContext(context).draw();
-    new VF.StaveConnector(trebleStave, bassStave).setType(ct.SINGLE_RIGHT).setContext(context).draw();
-
-    const COLOR_DONE    = "#6B7280";
-    const COLOR_CURRENT = "#00F0FF";
-    const COLOR_ERROR   = "#FF3366";
-    const COLOR_UPCOMING = "#E8ECF1";
+    const N = rlGame.notes.length;
 
     function colorFor(i) {
-      if (i < srIdx) return COLOR_DONE;
-      if (i === srIdx) return srErrorsOnCurrent > 0 ? COLOR_ERROR : COLOR_CURRENT;
-      return COLOR_UPCOMING;
+      if (rlGame.state === "revealed" || rlGame.state === "lost") return "#222";
+      // Durant joc: done=segons emoji, current=cyan, upcoming=clar
+      if (i < rlGame.noteIdx && rlGame.state === "playing") {
+        const e = rlGame.currentAttempt[i];
+        if (e === "🟩") return "#538d4e";
+        if (e === "🟨") return "#b59f3b";
+        if (e === "🟥") return "#c94f3f";
+        return "#6B7280";
+      }
+      if (i === rlGame.noteIdx && rlGame.state === "playing") return "#00A8B3";
+      return "#B8C2CC";
     }
 
-    const trebleNotes = srBatch.map((step, i) => {
-      const col = colorFor(i);
-      const sn = step.clef === "treble"
-        ? new VF.StaveNote({ clef: "treble", keys: [step.note], duration: "q" })
-        : new VF.StaveNote({ clef: "treble", keys: ["b/4"], duration: "qr" });
-      sn.setStyle({ fillStyle: col, strokeStyle: col });
-      return sn;
-    });
+    function buildVoice(clef, yStave) {
+      const stave = clef === "treble" ? trebleStave : bassStave;
+      const notes = rlGame.notes.map((step, i) => {
+        const col = colorFor(i);
+        let sn;
+        if (step.clef === clef) {
+          // Mostrar nota només quan està revelada o ja fet
+          const mustHide = rlGame.state === "playing" && i > rlGame.noteIdx;
+          if (mustHide) {
+            // Nota "pendent" mostrada com a símbol neutre (cap de nota gris clar)
+            sn = new VF.StaveNote({ clef, keys: [step.note], duration: "q" });
+            sn.setStyle({ fillStyle: "#D0D7DE", strokeStyle: "#D0D7DE" });
+          } else {
+            sn = new VF.StaveNote({ clef, keys: [step.note], duration: "q" });
+            sn.setStyle({ fillStyle: col, strokeStyle: col });
+          }
+        } else {
+          // Pausa per forats de l'altra clau
+          sn = new VF.StaveNote({ clef, keys: [clef === "treble" ? "b/4" : "d/3"], duration: "qr" });
+          sn.setStyle({ fillStyle: "#D0D7DE", strokeStyle: "#D0D7DE" });
+        }
+        return sn;
+      });
+      return { stave, notes, voice: new VF.Voice({ num_beats: N, beat_value: 4 }).setMode(VF.Voice.Mode.SOFT).addTickables(notes) };
+    }
 
-    const bassNotes = srBatch.map((step, i) => {
-      const col = colorFor(i);
-      const sn = step.clef === "bass"
-        ? new VF.StaveNote({ clef: "bass", keys: [step.note], duration: "q" })
-        : new VF.StaveNote({ clef: "bass", keys: ["d/3"], duration: "qr" });
-      sn.setStyle({ fillStyle: col, strokeStyle: col });
-      return sn;
-    });
+    const vt = buildVoice("treble");
+    let vb = null;
+    if (grandStaff) vb = buildVoice("bass");
 
-    const tv = new VF.Voice({ num_beats: srBatch.length, beat_value: 4 }).setMode(VF.Voice.Mode.SOFT).addTickables(trebleNotes);
-    const bv = new VF.Voice({ num_beats: srBatch.length, beat_value: 4 }).setMode(VF.Voice.Mode.SOFT).addTickables(bassNotes);
+    const formatter = new VF.Formatter();
+    if (grandStaff) formatter.joinVoices([vt.voice, vb.voice]).format([vt.voice, vb.voice], Math.max(150, staveWidth - 90));
+    else formatter.joinVoices([vt.voice]).format([vt.voice], Math.max(150, staveWidth - 90));
 
-    new VF.Formatter().joinVoices([tv, bv]).format([tv, bv], Math.max(150, staveWidth - 80));
-    tv.draw(context, trebleStave);
-    bv.draw(context, bassStave);
+    vt.voice.draw(context, trebleStave);
+    if (grandStaff) vb.voice.draw(context, bassStave);
   }
 
-  function srFormatTime(sec) {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return m + ":" + String(s).padStart(2, "0");
+  function rlRenderAttempts() {
+    rlAttemptsEl.innerHTML = "";
+    if (!rlGame) return;
+    const N = rlGame.notes.length;
+    for (let a = 0; a < RL_MAX_ATTEMPTS; a++) {
+      const row = document.createElement("div");
+      row.className = "rl-attempt-row";
+      const emojis = rlGame.attempts[a] || (a === rlGame.attempts.length ? rlGame.currentAttempt : null);
+      const isActive = (a === rlGame.attempts.length && rlGame.state === "playing");
+      if (isActive) row.classList.add("rl-attempt-active");
+      for (let i = 0; i < N; i++) {
+        const tile = document.createElement("div");
+        tile.className = "rl-tile";
+        if (emojis && emojis[i]) {
+          tile.classList.add("rl-tile-" + ({ "🟩": "green", "🟨": "gold", "🟥": "red" }[emojis[i]] || "empty"));
+          tile.textContent = emojis[i];
+        } else if (isActive && i === rlGame.noteIdx) {
+          tile.classList.add("rl-tile-current");
+        } else {
+          tile.classList.add("rl-tile-empty");
+        }
+        row.appendChild(tile);
+      }
+      rlAttemptsEl.appendChild(row);
+    }
   }
 
-  function srUpdateStats() {
-    const elapsedMs = performance.now() - srStartTime;
-    const elapsedSec = elapsedMs / 1000;
-    const npm = elapsedSec > 0 ? Math.round((srCorrect / elapsedSec) * 60) : 0;
-    const acc = srTotalAnswers > 0 ? Math.round((srCorrect / srTotalAnswers) * 100) : 0;
-    srCountEl.textContent = srCorrect;
-    srNpmEl.textContent = npm;
-    srAccEl.textContent = srTotalAnswers === 0 ? "—" : acc + "%";
+  function rlRefreshHeader() {
+    const d = rlToday();
+    const level = parseInt(rlLevelEl.value, 10);
+    const puzzleNum = rlPuzzleNumForDate(d);
+    rlPuzzleNumEl.textContent = "Relàmpec #" + puzzleNum;
+    rlDateEl.textContent = rlFormatDateCat(d);
+    const stats = rlGetLevelStats(level);
+    rlStreakNumEl.textContent = stats.currentStreak || 0;
+    rlPlayedEl.textContent = stats.played;
+    rlWonEl.textContent = stats.won;
+    rlWinrateEl.textContent = stats.played > 0 ? Math.round((stats.won / stats.played) * 100) + "%" : "—";
+    rlBestStreakEl.textContent = stats.bestStreak || 0;
   }
 
-  function srUpdateTimeDisplay() {
-    if (srState !== "playing") return;
-    const elapsed = performance.now() - srStartTime;
-    const remaining = Math.max(0, srDurationMs - elapsed);
-    srTimeEl.textContent = srFormatTime(Math.ceil(remaining / 1000));
-    srUpdateStats();
-    if (remaining <= 0) srEnd();
+  // --- Flow de joc ---
+  function rlStart() {
+    const mode = rlModeEl.value;
+    const level = parseInt(rlLevelEl.value, 10);
+
+    if (mode === "daily") {
+      const stats = rlGetLevelStats(level);
+      const today = rlDateKey(rlToday());
+      // Ja jugat avui?
+      if (stats.lastPlayDate === today && stats.lastPuzzleDone) {
+        rlShowCompletedDaily(stats, level);
+        return;
+      }
+    }
+
+    rlNewGame(mode, level);
+    rlGame.state = "playing";
+    rlGame.noteStart = performance.now();
+    rlCurrentNoteEl.textContent = "Quina és la primera nota?";
+    rlFeedbackEl.textContent = "";
+    rlFeedbackEl.className = "feedback";
+    rlStartBtn.disabled = true;
+    rlRevealBtn.style.display = "none";
+    rlCountdownEl.style.display = "none";
+    rlRender();
+    rlRenderAttempts();
   }
 
-  function srRefreshBestUI() {
-    const best = srGetBest();
-    srBestEl.textContent = best > 0 ? best + " NPM" : "—";
+  function rlShowCompletedDaily(stats, level) {
+    // Reconstrueix el puzzle d'avui per poder mostrar la graella i resultat
+    const d = rlToday();
+    const rng = rlMulberry32(rlSeedForDate(d, level));
+    const notes = rlGeneratePuzzle(level, rng);
+    rlGame = {
+      mode: "daily",
+      level,
+      puzzleNum: rlPuzzleNumForDate(d),
+      notes,
+      attempts: stats.lastPuzzleDone.attempts,
+      currentAttempt: [],
+      noteIdx: notes.length,
+      noteStart: 0,
+      state: stats.lastPuzzleDone.won ? "won" : "lost"
+    };
+    rlRender();
+    rlRenderAttempts();
+    rlFeedbackEl.textContent = stats.lastPuzzleDone.won
+      ? "Ja has completat el Relàmpec d'avui. 🔥"
+      : "Ja has jugat el Relàmpec d'avui.";
+    rlFeedbackEl.className = "feedback";
+    rlCurrentNoteEl.textContent = "Torna demà per un de nou, o juga en mode Lliure.";
+    rlStartCountdown();
+    rlStartBtn.disabled = true;
+    rlRevealBtn.style.display = "inline-flex";
+    rlShowResultModal();
   }
 
-  function srHandleAnswer(answerCa, btn) {
-    if (srState !== "playing") return;
-    if (!srBatch[srIdx]) return;
-    const current = srBatch[srIdx];
+  function rlAnswer(answerCa, btn) {
+    if (!rlGame || rlGame.state !== "playing") return;
+    const current = rlGame.notes[rlGame.noteIdx];
+    if (!current) return;
     const correctCa = NOTE_NAMES_CA[noteLetter(current.note)];
-    const timeMs = performance.now() - srNoteStartTime;
+    const dt = performance.now() - rlGame.noteStart;
 
+    let emoji;
     if (answerCa === correctCa) {
-      srCorrect++;
-      srTotalAnswers++;
-      srUpdateWeight(current, true, timeMs);
+      emoji = dt < RL_FAST_MS ? "🟩" : (dt < RL_SLOW_MS ? "🟨" : "🟨");
       playNote(current.note);
       btn.classList.add("correct-flash");
-      srIdx++;
-      srErrorsOnCurrent = 0;
-      srNoteStartTime = performance.now();
-      if (srIdx >= srBatch.length) {
-        srBatch = srBuildBatch();
-        srIdx = 0;
-      }
-      srRender();
     } else {
-      srTotalAnswers++;
-      srErrorsOnCurrent++;
-      srUpdateWeight(current, false, timeMs);
+      emoji = "🟥";
       playErrorSound();
-      shakeElement(srContainer);
+      shakeElement(rlStaffEl);
       btn.classList.add("wrong-flash");
-      srRender();
     }
-    setTimeout(() => {
-      btn.classList.remove("correct-flash", "wrong-flash");
-    }, 200);
-    srUpdateStats();
-  }
+    rlGame.currentAttempt.push(emoji);
+    rlGame.noteIdx++;
+    rlGame.noteStart = performance.now();
 
-  function srStart() {
-    srState = "playing";
-    srDurationMs = parseInt(srDurationEl.value, 10) * 1000;
-    srCorrect = 0;
-    srTotalAnswers = 0;
-    srErrorsOnCurrent = 0;
-    srStartTime = performance.now();
-    srNoteStartTime = srStartTime;
-    srBatch = srBuildBatch();
-    srIdx = 0;
-    srRender();
-    srUpdateStats();
-    srStartBtn.disabled = true;
-    srStopBtn.disabled = false;
-    srLevelEl.disabled = true;
-    srDurationEl.disabled = true;
-    srTimerInterval = setInterval(srUpdateTimeDisplay, 100);
-    srUpdateTimeDisplay();
-    srFeedbackEl.textContent = "Endavant!";
-    srFeedbackEl.className = "feedback correct";
-    flashClass(srFeedbackEl, "pop", 400);
-  }
+    setTimeout(() => { btn.classList.remove("correct-flash", "wrong-flash"); }, 200);
 
-  function srEnd() {
-    if (srState !== "playing") return;
-    srState = "complete";
-    clearInterval(srTimerInterval);
-    srStartBtn.disabled = false;
-    srStopBtn.disabled = true;
-    srLevelEl.disabled = false;
-    srDurationEl.disabled = false;
-    srTimeEl.textContent = "0:00";
+    rlRender();
+    rlRenderAttempts();
 
-    const elapsedSec = (performance.now() - srStartTime) / 1000;
-    const npm = elapsedSec > 0 ? Math.round((srCorrect / elapsedSec) * 60) : 0;
-    const prevBest = srGetBest();
-
-    if (npm > prevBest) {
-      srSetBest(npm);
-      srFeedbackEl.textContent = `🎉 ${npm} NPM · Nou rècord de lectura!`;
-      srFeedbackEl.className = "feedback correct";
-      playCongratulations();
-      spawnConfetti({ count: 100 });
+    if (rlGame.noteIdx >= rlGame.notes.length) {
+      rlFinishAttempt();
     } else {
-      srFeedbackEl.textContent = `${npm} NPM (millor: ${prevBest} NPM)`;
-      srFeedbackEl.className = "feedback";
-    }
-    flashClass(srFeedbackEl, "pop", 400);
-    srRefreshBestUI();
-  }
-
-  function srStop() {
-    if (srState === "playing") srEnd();
-  }
-
-  function srEnterScreen() {
-    // en entrar a la pantalla, dibuixem un pentagrama buit o amb una demo
-    srRefreshBestUI();
-    if (srState !== "playing") {
-      srBatch = srBuildBatch();
-      srIdx = 0;
-      srErrorsOnCurrent = 0;
-      srRender();
-      srFeedbackEl.textContent = "Prem Començar per iniciar.";
-      srFeedbackEl.className = "feedback";
-      srTimeEl.textContent = srFormatTime(parseInt(srDurationEl.value, 10));
-      srCountEl.textContent = "0";
-      srNpmEl.textContent = "0";
-      srAccEl.textContent = "—";
+      rlCurrentNoteEl.textContent = "Nota " + (rlGame.noteIdx + 1) + " de " + rlGame.notes.length;
     }
   }
 
-  srStartBtn.addEventListener("click", srStart);
-  srStopBtn.addEventListener("click", srStop);
-  srNoteButtons.forEach(btn => {
-    btn.addEventListener("click", () => srHandleAnswer(btn.dataset.note, btn));
+  function rlFinishAttempt() {
+    const row = rlGame.currentAttempt.slice();
+    rlGame.attempts.push(row);
+    rlGame.currentAttempt = [];
+    rlGame.noteIdx = 0;
+
+    const anyWrong = row.includes("🟥");
+    const attemptNum = rlGame.attempts.length;
+
+    if (!anyWrong) {
+      rlGame.state = "won";
+      rlRender();
+      rlRenderAttempts();
+      rlOnWin(attemptNum);
+    } else if (attemptNum >= RL_MAX_ATTEMPTS) {
+      rlGame.state = "lost";
+      rlRender();
+      rlRenderAttempts();
+      rlOnLoss();
+    } else {
+      // Nou intent
+      rlGame.noteStart = performance.now();
+      rlCurrentNoteEl.textContent = "Intent " + (attemptNum + 1) + "/" + RL_MAX_ATTEMPTS + " · endavant!";
+      rlRender();
+      rlRenderAttempts();
+    }
+  }
+
+  function rlOnWin(attemptNum) {
+    rlFeedbackEl.textContent = "🎉 Guanyat en " + attemptNum + "/" + RL_MAX_ATTEMPTS + "!";
+    rlFeedbackEl.className = "feedback correct";
+    flashClass(rlFeedbackEl, "pop", 400);
+    playCongratulations();
+    spawnConfetti({ count: 120 });
+
+    if (rlGame.mode === "daily") {
+      const stats = rlGetLevelStats(rlGame.level);
+      rlUpdateStreak(stats, true);
+      stats.played++;
+      stats.won++;
+      stats.distribution[String(attemptNum)]++;
+      stats.lastPuzzleNum = rlGame.puzzleNum;
+      stats.lastPuzzleDone = { won: true, attempts: rlGame.attempts, attemptNum };
+      stats.lastPlayDate = rlDateKey(rlToday());
+      rlSetLevelStats(rlGame.level, stats);
+    }
+    rlRefreshHeader();
+    rlStartBtn.disabled = rlGame.mode === "daily";
+    rlRevealBtn.style.display = "none";
+    if (rlGame.mode === "daily") rlStartCountdown();
+    setTimeout(() => rlShowResultModal(), 600);
+  }
+
+  function rlOnLoss() {
+    rlFeedbackEl.textContent = "Has esgotat els intents. Prem Revelar per veure la solució.";
+    rlFeedbackEl.className = "feedback wrong";
+    flashClass(rlFeedbackEl, "pop", 400);
+    playErrorSound();
+
+    if (rlGame.mode === "daily") {
+      const stats = rlGetLevelStats(rlGame.level);
+      rlUpdateStreak(stats, false);
+      stats.played++;
+      stats.distribution["X"]++;
+      stats.lastPuzzleNum = rlGame.puzzleNum;
+      stats.lastPuzzleDone = { won: false, attempts: rlGame.attempts, attemptNum: RL_MAX_ATTEMPTS };
+      stats.lastPlayDate = rlDateKey(rlToday());
+      rlSetLevelStats(rlGame.level, stats);
+    }
+    rlRefreshHeader();
+    rlStartBtn.disabled = rlGame.mode === "daily";
+    rlRevealBtn.style.display = "inline-flex";
+    if (rlGame.mode === "daily") rlStartCountdown();
+    setTimeout(() => rlShowResultModal(), 500);
+  }
+
+  function rlUpdateStreak(stats, won) {
+    if (won) {
+      stats.currentStreak = (stats.currentStreak || 0) + 1;
+      if (stats.currentStreak > (stats.bestStreak || 0)) stats.bestStreak = stats.currentStreak;
+    } else {
+      stats.currentStreak = 0;
+    }
+  }
+
+  function rlReveal() {
+    if (!rlGame) return;
+    rlGame.state = "revealed";
+    rlRender();
+    rlCurrentNoteEl.textContent = "Solució revelada. Mode Lliure per jugar-ne més.";
+  }
+
+  // --- Countdown ---
+  let rlCountdownTimer = null;
+  function rlStartCountdown() {
+    rlCountdownEl.style.display = "flex";
+    function tick() {
+      const now = new Date();
+      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+      const diff = tomorrow - now;
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      const txt = String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+      rlCountdownTimeEl.textContent = txt;
+      if (rlResultCountdown) rlResultCountdown.textContent = "Pròxim Relàmpec en " + txt;
+    }
+    tick();
+    clearInterval(rlCountdownTimer);
+    rlCountdownTimer = setInterval(tick, 1000);
+  }
+
+  // --- Modal resultat ---
+  function rlBuildShareText() {
+    if (!rlGame) return "";
+    const cfg = RL_LEVELS[rlGame.level];
+    const lines = [];
+    const header = rlGame.mode === "daily"
+      ? "Pentagrama Relàmpec #" + rlGame.puzzleNum + " · " + cfg.label.split(" · ")[0]
+      : "Pentagrama Relàmpec · " + cfg.label.split(" · ")[0] + " (Lliure)";
+    let badge;
+    if (rlGame.state === "won") badge = rlGame.attempts.length + "/" + RL_MAX_ATTEMPTS;
+    else if (rlGame.state === "lost") badge = "X/" + RL_MAX_ATTEMPTS;
+    else badge = "—";
+    lines.push(header + " · " + badge);
+    lines.push("");
+    for (const row of rlGame.attempts) lines.push(row.join(""));
+    lines.push("");
+    const stats = rlGetLevelStats(rlGame.level);
+    if (stats.currentStreak > 0) lines.push("🔥 Ratxa " + stats.currentStreak);
+    lines.push("https://xonsinieto.github.io/programa-musical/");
+    return lines.join("\n");
+  }
+
+  function rlShowResultModal() {
+    if (!rlGame) return;
+    const cfg = RL_LEVELS[rlGame.level];
+    const stats = rlGetLevelStats(rlGame.level);
+
+    let badge, title;
+    if (rlGame.state === "won") {
+      badge = rlGame.attempts.length + "/" + RL_MAX_ATTEMPTS;
+      title = rlGame.attempts.length === 1 ? "Perfecte! ⚡" : "Guanyat!";
+    } else if (rlGame.state === "lost") {
+      badge = "X/" + RL_MAX_ATTEMPTS;
+      title = "Sense sort avui";
+    } else {
+      badge = "—";
+      title = "Relàmpec";
+    }
+    rlResultBadge.textContent = badge;
+    rlResultTitle.textContent = title;
+    const subBits = [];
+    if (rlGame.mode === "daily") subBits.push("Relàmpec #" + rlGame.puzzleNum);
+    else subBits.push("Mode Lliure");
+    subBits.push(cfg.label);
+    rlResultSub.textContent = subBits.join(" · ");
+
+    // Grid
+    rlResultGrid.innerHTML = "";
+    for (const row of rlGame.attempts) {
+      const r = document.createElement("div");
+      r.className = "rl-result-row";
+      for (const e of row) {
+        const t = document.createElement("div");
+        t.className = "rl-tile rl-tile-" + ({ "🟩": "green", "🟨": "gold", "🟥": "red" }[e] || "empty");
+        t.textContent = e;
+        r.appendChild(t);
+      }
+      rlResultGrid.appendChild(r);
+    }
+
+    rlResultStreakNum.textContent = stats.currentStreak || 0;
+
+    // Distribució
+    rlDistRowsEl.innerHTML = "";
+    const buckets = ["1", "2", "3", "X"];
+    const maxVal = Math.max(1, ...buckets.map(b => stats.distribution[b] || 0));
+    for (const b of buckets) {
+      const v = stats.distribution[b] || 0;
+      const row = document.createElement("div");
+      row.className = "rl-dist-row";
+      const isMine = rlGame.state !== "idle" && (
+        (rlGame.state === "won" && String(rlGame.attempts.length) === b) ||
+        (rlGame.state === "lost" && b === "X")
+      );
+      if (isMine) row.classList.add("rl-dist-row-mine");
+      row.innerHTML = `<span class="rl-dist-lbl">${b}</span><span class="rl-dist-bar-wrap"><span class="rl-dist-bar" style="width:${Math.max(8, Math.round(v / maxVal * 100))}%">${v}</span></span>`;
+      rlDistRowsEl.appendChild(row);
+    }
+
+    // Mostrar botó free si mode daily; ocultar si mode lliure
+    rlFreeBtn.style.display = rlGame.mode === "daily" ? "inline-flex" : "none";
+
+    rlResultModal.classList.remove("hidden");
+    rlResultModal.setAttribute("aria-hidden", "false");
+
+    if (rlGame.mode === "daily") rlStartCountdown();
+  }
+
+  function rlCloseResultModal() {
+    rlResultModal.classList.add("hidden");
+    rlResultModal.setAttribute("aria-hidden", "true");
+  }
+
+  async function rlShare() {
+    const text = rlBuildShareText();
+    try {
+      if (navigator.share) {
+        await navigator.share({ text });
+        showToast("Compartit!");
+        return;
+      }
+    } catch (e) { /* user cancelled, continue */ }
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("Resultat copiat al porta-retalls ✂️");
+    } catch (e) {
+      showToast("No s'ha pogut copiar");
+    }
+  }
+
+  function rlEnterScreen() {
+    rlRefreshHeader();
+    const level = parseInt(rlLevelEl.value, 10);
+    const mode = rlModeEl.value;
+    if (mode === "daily") {
+      const stats = rlGetLevelStats(level);
+      const today = rlDateKey(rlToday());
+      if (stats.lastPlayDate === today && stats.lastPuzzleDone) {
+        rlShowCompletedDaily(stats, level);
+        return;
+      }
+    }
+    // Estat idle: mostrem la portada sense puzzle encara
+    rlGame = null;
+    rlStaffEl.innerHTML = "";
+    rlAttemptsEl.innerHTML = "";
+    rlCurrentNoteEl.textContent = "";
+    rlFeedbackEl.textContent = mode === "daily"
+      ? "El puzzle d'avui t'espera. 3 intents, una solució."
+      : "Mode Lliure: puzzles infinits, sense pressió de ratxa.";
+    rlFeedbackEl.className = "feedback";
+    rlStartBtn.disabled = false;
+    rlRevealBtn.style.display = "none";
+    rlCountdownEl.style.display = "none";
+    rlCloseResultModal();
+  }
+
+  // --- Event wiring ---
+  rlStartBtn.addEventListener("click", rlStart);
+  rlRevealBtn.addEventListener("click", rlReveal);
+  rlNoteButtons.forEach(btn => {
+    btn.addEventListener("click", () => rlAnswer(btn.dataset.note, btn));
   });
-  srLevelEl.addEventListener("change", () => {
-    if (srState === "idle" || srState === "complete") {
-      srBatch = srBuildBatch();
-      srIdx = 0;
-      srRender();
-      srRefreshBestUI();
+  rlLevelEl.addEventListener("change", () => {
+    const st = rlGetProfileState();
+    rlRefreshHeader();
+    if (!rlGame || rlGame.state === "idle" || rlGame.state === "won" || rlGame.state === "lost" || rlGame.state === "revealed") {
+      rlEnterScreen();
+    }
+  });
+  rlModeEl.addEventListener("change", () => {
+    const st = rlGetProfileState();
+    st.preferences.mode = rlModeEl.value;
+    rlSaveProfileState(st);
+    rlEnterScreen();
+  });
+  rlResultModal.addEventListener("click", (e) => {
+    const t = e.target;
+    if (t && (t.dataset.rlClose !== undefined || t.getAttribute("data-rl-close") !== null)) {
+      rlCloseResultModal();
+    }
+  });
+  rlShareBtn.addEventListener("click", rlShare);
+  rlFreeBtn.addEventListener("click", () => {
+    rlCloseResultModal();
+    rlModeEl.value = "free";
+    rlModeEl.dispatchEvent(new Event("change"));
+    setTimeout(() => rlStart(), 100);
+  });
+  // Tancar modal amb Escape
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !rlResultModal.classList.contains("hidden")) {
+      rlCloseResultModal();
     }
   });
 
@@ -2684,7 +3039,7 @@
       if (sequence.length === 0) startRound();
       else render();
     }
-    if (screenId === "sightread") srEnterScreen();
+    if (screenId === "sightread") rlEnterScreen();
     if (screenId === "speed" && !spRunning) {
       spShowOverlay(spOvStart);
       spFeedbackEl.textContent = "";

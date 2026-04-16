@@ -68,7 +68,7 @@
       <button class="tab active" data-screen="reference">Referència</button>
       <button class="tab" data-screen="train">Lectura</button>
       <button class="tab" data-screen="speed">Velocitat</button>
-      <button class="tab" data-screen="sightread">Lectura Pro</button>
+      <button class="tab" data-screen="sightread">Relàmpec</button>
     </nav>
   </header>
 
@@ -158,49 +158,101 @@
       <div id="ref-staff-container"></div>
     </section>
 
-    <!-- LECTURA PRO (sight-read trainer amb spaced repetition) -->
+    <!-- PENTAGRAMA RELÀMPEC (puzzle diari, estil Wordle) -->
     <section id="screen-sightread" class="screen">
-      <div class="controls">
+      <div class="rl-header">
+        <div class="rl-title-block">
+          <div class="rl-eyebrow">
+            <span class="rl-puzzle-num" id="rl-puzzle-num">Relàmpec #—</span>
+            <span class="rl-date" id="rl-date">—</span>
+          </div>
+          <h2 class="rl-title">Pentagrama <em>Relàmpec</em></h2>
+          <p class="rl-tagline">Un puzzle nou cada dia. 3 intents. Sigues ràpid.</p>
+        </div>
+        <div class="rl-streak-pill" id="rl-streak-pill" title="Ratxa diària">
+          <span class="rl-streak-emoji">🔥</span>
+          <span class="rl-streak-num" id="rl-streak-num">0</span>
+        </div>
+      </div>
+
+      <div class="rl-controls">
         <label>
           Nivell:
-          <select id="sr-level">
-            <option value="1" selected>1 - Principiant</option>
-            <option value="2">2 - Piano</option>
-            <option value="3">3 - Pro</option>
+          <select id="rl-level">
+            <option value="1" selected>L1 · Principiant</option>
+            <option value="2">L2 · Bàsic</option>
+            <option value="3">L3 · Intermedi</option>
+            <option value="4">L4 · Avançat</option>
+            <option value="5">L5 · Pro</option>
           </select>
         </label>
         <label>
-          Durada:
-          <select id="sr-duration">
-            <option value="60">1 min</option>
-            <option value="120" selected>2 min</option>
-            <option value="300">5 min</option>
+          Mode:
+          <select id="rl-mode">
+            <option value="daily" selected>Diari</option>
+            <option value="free">Lliure (infinit)</option>
           </select>
         </label>
-        <button id="sr-start-btn" class="big-start">Començar</button>
-        <button id="sr-stop-btn" disabled>Aturar</button>
+        <button id="rl-start-btn" class="big-start">Començar</button>
+        <button id="rl-reveal-btn" class="rl-secondary-btn" style="display:none">Revelar solució</button>
       </div>
 
-      <div id="sr-staff-container"></div>
+      <div id="rl-countdown" class="rl-countdown" style="display:none">
+        <span class="rl-countdown-label">Pròxim Relàmpec en</span>
+        <span class="rl-countdown-time" id="rl-countdown-time">—</span>
+      </div>
 
-      <div id="sr-feedback" class="feedback"></div>
+      <div id="rl-staff-container" class="rl-staff"></div>
+
+      <div id="rl-current-note" class="rl-current-note" aria-live="polite"></div>
+
+      <div id="rl-attempts" class="rl-attempts"></div>
+
+      <div id="rl-feedback" class="feedback"></div>
 
       <div class="answer-buttons">
-        <button class="note-btn sr-note-btn" data-note="do">Do</button>
-        <button class="note-btn sr-note-btn" data-note="re">Re</button>
-        <button class="note-btn sr-note-btn" data-note="mi">Mi</button>
-        <button class="note-btn sr-note-btn" data-note="fa">Fa</button>
-        <button class="note-btn sr-note-btn" data-note="sol">Sol</button>
-        <button class="note-btn sr-note-btn" data-note="la">La</button>
-        <button class="note-btn sr-note-btn" data-note="si">Si</button>
+        <button class="note-btn rl-note-btn" data-note="do">Do</button>
+        <button class="note-btn rl-note-btn" data-note="re">Re</button>
+        <button class="note-btn rl-note-btn" data-note="mi">Mi</button>
+        <button class="note-btn rl-note-btn" data-note="fa">Fa</button>
+        <button class="note-btn rl-note-btn" data-note="sol">Sol</button>
+        <button class="note-btn rl-note-btn" data-note="la">La</button>
+        <button class="note-btn rl-note-btn" data-note="si">Si</button>
       </div>
 
-      <div class="stats">
-        <span>Temps: <strong id="sr-time">—</strong></span>
-        <span>Notes: <strong id="sr-count">0</strong></span>
-        <span>NPM: <strong id="sr-npm">0</strong></span>
-        <span>Precisió: <strong id="sr-acc">—</strong></span>
-        <span>Millor: <strong id="sr-best">—</strong></span>
+      <div class="stats rl-stats">
+        <span>Jugats: <strong id="rl-played">0</strong></span>
+        <span>Guanyats: <strong id="rl-won">0</strong></span>
+        <span>% èxit: <strong id="rl-winrate">—</strong></span>
+        <span>Millor ratxa: <strong id="rl-best-streak">0</strong></span>
+      </div>
+
+      <!-- RESULT MODAL -->
+      <div id="rl-result-modal" class="modal hidden" aria-hidden="true">
+        <div class="modal-backdrop" data-rl-close></div>
+        <div class="modal-content rl-result-content">
+          <button class="modal-close" data-rl-close aria-label="Tancar">×</button>
+          <div class="rl-result-head">
+            <div class="rl-result-badge" id="rl-result-badge">2/3</div>
+            <h3 class="rl-result-title" id="rl-result-title">Guanyat!</h3>
+            <p class="rl-result-sub" id="rl-result-sub">Relàmpec #— · L1</p>
+          </div>
+          <div class="rl-result-grid" id="rl-result-grid"></div>
+          <div class="rl-result-streak">
+            <div class="rl-result-streak-line">
+              <span>🔥 Ratxa</span><strong id="rl-result-streak-num">0</strong>
+            </div>
+          </div>
+          <div class="rl-distribution">
+            <div class="rl-dist-title">Distribució</div>
+            <div class="rl-dist-rows" id="rl-dist-rows"></div>
+          </div>
+          <div class="rl-result-actions">
+            <button id="rl-share-btn" class="big-start">📋 Compartir</button>
+            <button id="rl-free-btn" class="rl-secondary-btn">Seguir en Lliure</button>
+          </div>
+          <div class="rl-result-countdown" id="rl-result-countdown">Pròxim en —</div>
+        </div>
       </div>
     </section>
 
