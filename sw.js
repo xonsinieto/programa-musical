@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v18-install";
+const CACHE = "lectura-notes-v19-clean";
 const FILES = [
   "./",
   "./index.html",

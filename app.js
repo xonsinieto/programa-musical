@@ -424,46 +424,6 @@
     refreshProfileUI();
   });
 
-  const profileExportBtn = document.getElementById("profile-export-btn");
-  const profileImportBtn = document.getElementById("profile-import-btn");
-
-  profileExportBtn.addEventListener("click", () => {
-    const name = currentProfile();
-    if (name === "Convidat") {
-      alert("El perfil 'Convidat' no es pot exportar. Crea un perfil amb nom primer (botó +).");
-      return;
-    }
-    const all = loadAllStats();
-    const payload = { v: 1, name, stats: all[name] || {} };
-    const code = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-    prompt(
-      `Codi del perfil "${name}". Copia'l i enganxa'l a l'altre dispositiu (botó 📥 Importar):`,
-      code
-    );
-  });
-
-  profileImportBtn.addEventListener("click", () => {
-    const code = prompt("Enganxa el codi del perfil que vols importar:");
-    if (!code) return;
-    try {
-      const payload = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
-      if (!payload || !payload.name || typeof payload.stats !== "object") {
-        throw new Error("Format invàlid");
-      }
-      const p = loadProfiles();
-      if (!p.list.includes(payload.name)) p.list.push(payload.name);
-      p.current = payload.name;
-      saveProfiles(p);
-      const all = loadAllStats();
-      all[payload.name] = payload.stats;
-      saveAllStats(all);
-      refreshProfileUI();
-      alert(`Perfil "${payload.name}" importat correctament.`);
-    } catch (e) {
-      alert("Codi invàlid. Assegura't d'enganxar-lo sencer.");
-    }
-  });
-
   refreshProfileUI();
 
   // En obrir l'app amb el perfil "Convidat", netegem les seves estadístiques.

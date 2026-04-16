@@ -924,16 +924,14 @@ nav.tabs .tab:active {
   outline-offset: 2px;
 }
 
-.profile-bar #profile-new-btn,
-.profile-bar #profile-export-btn,
-.profile-bar #profile-import-btn {
+.profile-bar #profile-new-btn {
   background: var(--card-bg);
   color: var(--primary);
   border: 1.5px solid var(--rule);
   border-radius: 50%;
   width: 36px;
   height: 36px;
-  font-size: 1.05rem;
+  font-size: 1.35rem;
   font-weight: 700;
   line-height: 1;
   padding: 0;
@@ -942,10 +940,6 @@ nav.tabs .tab:active {
   align-items: center;
   justify-content: center;
   transition: all 180ms ease;
-}
-
-.profile-bar #profile-new-btn {
-  font-size: 1.35rem;
 }
 
 .profile-bar button:hover {
@@ -1890,14 +1884,11 @@ main {
     height: 7px;
     border-width: 1.5px;
   }
-  .profile-bar #profile-new-btn,
-  .profile-bar #profile-export-btn,
-  .profile-bar #profile-import-btn {
+  .profile-bar #profile-new-btn {
     width: 26px;
     height: 26px;
-    font-size: 0.72rem;
+    font-size: 0.95rem;
   }
-  .profile-bar #profile-new-btn { font-size: 0.95rem; }
   main {
     padding: 0 3px;
     margin: 4px auto;
