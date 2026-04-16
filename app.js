@@ -3036,10 +3036,9 @@
   const huContainer     = document.getElementById("hu-game-container");
   const huOverlay       = document.getElementById("hu-overlay");
   const huMemoBar       = document.getElementById("hu-memo-bar");
-  const huOvFail        = document.getElementById("hu-ov-fail");
+  const huRetryBar      = document.getElementById("hu-retry-bar");
   const huOvLevelUp     = document.getElementById("hu-ov-levelup");
   const huOvWin         = document.getElementById("hu-ov-win");
-  const huOvFailSub     = document.getElementById("hu-ov-fail-sub");
   const huLvlUpTitle    = document.getElementById("hu-lvlup-title");
   const huLvlUpSub      = document.getElementById("hu-lvlup-sub");
   const huWinTargetEl   = document.getElementById("hu-win-target");
@@ -3143,7 +3142,7 @@
     huSvg.appendChild(huNoteGroup);
   }
 
-  // Fase memoritzar: dibuixa totes les posicions de la diana en cian, estàtiques
+  // Fase memoritzar: dibuixa totes les posicions de la diana, estàtiques en NEGRE
   function huShowMemorize() {
     huState = "memorize";
     if (huRAF) { cancelAnimationFrame(huRAF); huRAF = null; }
@@ -3151,13 +3150,13 @@
     const clefs = huClefSelect.value === "both" ? ["treble", "bass"] : [huClefSelect.value];
     const level = parseInt(huLevelSelect.value, 10) || 3;
     const SVG_NS = "http://www.w3.org/2000/svg";
-    // Distribuïm les posicions-diana uniformement entre hitLine i spawn
+    // Recollim totes les posicions de la lletra-diana dins el rang del nivell + claus
     let targetEntries = [];
     clefs.forEach(clef => {
       const pool = (level === 3 || !LEVELS[level]) ? RANGES[clef] : LEVELS[level][clef];
       pool.filter(n => noteLetter(n) === huTarget).forEach(n => targetEntries.push({ clef, note: n }));
     });
-    // Espaiat horitzontal
+    // Espaiat horitzontal uniforme entre hit-line i spawn
     const startX = huHitLineX + 80;
     const endX = huSpawnX - 40;
     const usable = Math.max(1, endX - startX);
@@ -3170,15 +3169,10 @@
       spDrawLedgers(g, SVG_NS, y, e.clef);
       spDrawQuarterNote(g, SVG_NS, y, e.clef);
       g.style.transform = "translate3d(" + x + "px, " + y + "px, 0)";
-      // Ressalta en cian (fill + stroke)
-      g.querySelectorAll("ellipse").forEach(el => {
-        el.setAttribute("fill", "#00A8B3");
-        el.setAttribute("stroke", "#00A8B3");
-      });
-      g.querySelectorAll("line").forEach(el => el.setAttribute("stroke", "#00A8B3"));
+      // NO recolorem: queden negres com les del pentagrama natural
       huNoteGroup.appendChild(g);
     });
-    // Mostra la barra translúcida "Memoritza els XX · Començar" SENSE tapar el pentagrama
+    // Mostra la barra inferior "Memoritza els XX · Començar" (fora del pentagrama)
     huShowMemoBar();
     huRefreshBestUI();
     huStreakEl.textContent = "0";
@@ -3247,15 +3241,6 @@
     g.style.pointerEvents = "all";
     g.style.cursor = "pointer";
 
-    // Zona clicable més gran per facilitar el toc al mòbil
-    const hit = document.createElementNS(SVG_NS, "rect");
-    hit.setAttribute("x", -18);
-    hit.setAttribute("y", -28);
-    hit.setAttribute("width", 36);
-    hit.setAttribute("height", 56);
-    hit.setAttribute("fill", "rgba(0,0,0,0.001)");
-    g.appendChild(hit);
-
     huNoteGroup.appendChild(g);
     const anim = g.animate([
       { transform: "translate3d(" + startX + "px, " + y + "px, 0)" },
@@ -3312,6 +3297,8 @@
     huActive.forEach(x => { if (x.anim) { try { x.anim.pause(); } catch(e) {} } });
     playErrorSound();
     shakeElement(huContainer);
+    // Marca la nota culpable en vermell + etiqueta amb el nom. Queda visible sobre el
+    // pentagrama perquè l'usuari pugui veure EXACTAMENT quina nota ha fallat.
     spColorNote(n.el, "#e74c3c");
     burstNoteAt(n.el, ["#FF3366", "#9A1750", "#BC4749"], 18);
     const SVG_NS = "http://www.w3.org/2000/svg";
@@ -3325,21 +3312,38 @@
     label.textContent = NOTE_NAMES_CA[noteLetter(n.note)].toUpperCase();
     n.el.appendChild(label);
 
-    // Rècord per aquesta configuració (clef+level+target+speed)
+    // Barra inferior FORA del pentagrama (igual que sp-retry-bar) — no tapa notes
+    const failName  = NOTE_NAMES_CA[noteLetter(n.note)].toUpperCase();
+    const failNameEl  = document.getElementById("hu-fail-name");
+    const failScoreEl = document.getElementById("hu-fail-score");
+    const failBestEl  = document.getElementById("hu-fail-best");
+    if (failNameEl)  failNameEl.textContent  = failName;
+    if (failScoreEl) failScoreEl.textContent = huCorrect + "/" + SP_STREAK_TO_ADVANCE;
+
     const prevBest = getHuBest();
-    let extra = "";
-    if (huCorrect > prevBest) {
+    const isRecord = huCorrect > prevBest;
+    const isTie = huCorrect > 0 && huCorrect === prevBest;
+    if (isRecord) {
       setHuBest(huCorrect);
-      extra = " · 🏆 Nou rècord (" + huCorrect + ")";
       playCongratulations();
-    } else if (huCorrect > 0 && huCorrect === prevBest) {
-      extra = " · 👍 Empat (" + huCorrect + ")";
+    } else if (isTie) {
       playEncouragement();
-    } else if (prevBest > 0) {
-      extra = " · (millor: " + prevBest + ")";
     }
-    huOvFailSub.textContent = msg + " · " + huCorrect + "/" + SP_STREAK_TO_ADVANCE + extra;
-    huShowOverlay(huOvFail);
+    if (failScoreEl) {
+      failScoreEl.classList.remove("is-record", "is-tie");
+      if (isRecord) failScoreEl.classList.add("is-record");
+      else if (isTie) failScoreEl.classList.add("is-tie");
+    }
+    if (failBestEl) {
+      if (isRecord) failBestEl.textContent = "🏆 Nou rècord";
+      else if (isTie) failBestEl.textContent = "👍 Empat";
+      else if (prevBest > 0) failBestEl.textContent = "millor: " + prevBest + "/" + SP_STREAK_TO_ADVANCE;
+      else failBestEl.textContent = "";
+    }
+
+    // Amaga la barra de memoritzar i mostra la retry-bar
+    if (huMemoBar) huMemoBar.classList.add("hidden");
+    if (huRetryBar) huRetryBar.classList.remove("hidden");
     huRefreshBestUI();
   }
 
@@ -3407,17 +3411,20 @@
   }
 
   function huShowOverlay(panel) {
-    if (huMemoBar) huMemoBar.classList.add("hidden");
+    if (huMemoBar)  huMemoBar.classList.add("hidden");
+    if (huRetryBar) huRetryBar.classList.add("hidden");
     huOverlay.classList.remove("hidden");
-    [huOvFail, huOvLevelUp, huOvWin].forEach(p => p.classList.add("hidden"));
+    [huOvLevelUp, huOvWin].forEach(p => p.classList.add("hidden"));
     if (panel) panel.classList.remove("hidden");
   }
   function huHideOverlay() {
     huOverlay.classList.add("hidden");
-    if (huMemoBar) huMemoBar.classList.add("hidden");
+    if (huMemoBar)  huMemoBar.classList.add("hidden");
+    if (huRetryBar) huRetryBar.classList.add("hidden");
   }
   function huShowMemoBar() {
     huOverlay.classList.add("hidden");
+    if (huRetryBar) huRetryBar.classList.add("hidden");
     if (huMemoBar) huMemoBar.classList.remove("hidden");
   }
 

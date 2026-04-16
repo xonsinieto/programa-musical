@@ -2585,74 +2585,114 @@ main {
   opacity: 0;
 }
 
-/* Barra de memorització: flota a la part baixa del game-container, NO tapa el pentagrama */
-.hu-memo-bar {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 12;
+/* Barres INFORMATIVES del joc Caça — FORA del pentagrama, mai tapen notes.
+   .hu-memo-bar = "Memoritza els DO · Començar"
+   .hu-retry-bar = "Has fallat — era DO · 0/30 · Torna-ho a provar" */
+.hu-info-bar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 14px 22px;
-  padding: 14px 20px 16px;
-  background: linear-gradient(to top, rgba(5, 7, 15, 0.92) 30%, rgba(5, 7, 15, 0.6) 70%, transparent);
-  backdrop-filter: blur(8px) saturate(1.2);
-  -webkit-backdrop-filter: blur(8px) saturate(1.2);
-  animation: huMemoBarIn 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  gap: 12px 20px;
+  margin: 10px 0 6px;
+  padding: 10px 16px;
+  background: rgba(18, 22, 45, 0.65);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  animation: huBarIn 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-@keyframes huMemoBarIn {
-  from { opacity: 0; transform: translateY(30px); }
+.hu-info-bar-fail {
+  border-color: rgba(255, 51, 102, 0.35);
+  box-shadow: 0 6px 24px rgba(255, 51, 102, 0.18), 0 0 0 1px rgba(255, 51, 102, 0.12) inset;
+}
+.hu-info-bar.hidden { display: none; }
+@keyframes huBarIn {
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.hu-memo-bar.hidden { display: none; }
-.hu-memo-text {
+.hu-info-text {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px 12px;
   flex-wrap: wrap;
   justify-content: center;
   font-family: var(--font-body);
   font-size: 0.92rem;
   color: rgba(232, 236, 241, 0.85);
 }
-.hu-memo-label {
+.hu-info-label {
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   font-size: 0.78rem;
-  color: rgba(232, 236, 241, 0.65);
+  color: rgba(232, 236, 241, 0.7);
 }
-.hu-memo-bar strong {
+.hu-info-bar strong {
   font-family: var(--font-display);
   font-weight: 900;
-  font-size: 1.9rem;
+  font-size: 1.6rem;
   background: linear-gradient(100deg, #00F0FF, #FF10F0);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   letter-spacing: 0.02em;
 }
-.hu-memo-hint {
-  font-size: 0.76rem;
-  color: rgba(232, 236, 241, 0.55);
+.hu-info-bar-fail strong {
+  background: none;
+  -webkit-text-fill-color: var(--error);
+  color: var(--error);
+  text-shadow: 0 0 16px rgba(255, 51, 102, 0.5);
+  letter-spacing: 0.08em;
+  font-size: 1.45rem;
+}
+.hu-info-score {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink);
+  padding: 2px 10px;
+  background: rgba(255, 51, 102, 0.12);
+  border: 1px solid rgba(255, 51, 102, 0.35);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+.hu-info-score.is-record {
+  background: rgba(0, 240, 255, 0.14);
+  border-color: rgba(0, 240, 255, 0.5);
+  color: var(--primary);
+}
+.hu-info-score.is-tie {
+  background: rgba(255, 184, 0, 0.14);
+  border-color: rgba(255, 184, 0, 0.45);
+  color: var(--gold);
+}
+.hu-info-best {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: rgba(232, 236, 241, 0.7);
   letter-spacing: 0.04em;
 }
-.hu-memo-start {
+.hu-info-best:empty { display: none; }
+.hu-info-start {
   font-size: 0.95rem !important;
-  padding: 11px 26px !important;
+  padding: 10px 24px !important;
 }
 @media (max-width: 600px) {
-  .hu-memo-bar {
-    padding: 10px 12px 12px;
+  .hu-info-bar {
+    padding: 8px 12px;
     gap: 8px 14px;
+    margin: 8px 0 4px;
   }
-  .hu-memo-text { font-size: 0.78rem; gap: 6px; }
-  .hu-memo-label { font-size: 0.64rem; letter-spacing: 0.1em; }
-  .hu-memo-bar strong { font-size: 1.4rem; }
-  .hu-memo-hint { display: none; }
-  .hu-memo-start { font-size: 0.85rem !important; padding: 9px 18px !important; }
+  .hu-info-text { font-size: 0.8rem; gap: 4px 8px; }
+  .hu-info-label { font-size: 0.64rem; letter-spacing: 0.08em; }
+  .hu-info-bar strong { font-size: 1.25rem; }
+  .hu-info-bar-fail strong { font-size: 1.15rem; }
+  .hu-info-score { font-size: 0.78rem; padding: 2px 8px; }
+  .hu-info-best { font-size: 0.68rem; }
+  .hu-info-start { font-size: 0.82rem !important; padding: 8px 16px !important; }
 }
 
 /* Notes del pentagrama Caça: cursor pointer i zoom lleuger en hover (desktop) */
@@ -2667,16 +2707,9 @@ main {
   }
 }
 
-/* Notes estàtiques durant fase memoritzar: pulsació suau cian */
-@keyframes huMemoPulse {
-  0%, 100% { filter: drop-shadow(0 0 4px rgba(0, 240, 255, 0.7)); }
-  50%      { filter: drop-shadow(0 0 14px rgba(0, 240, 255, 1)); }
-}
+/* Notes estàtiques durant fase memoritzar: negres com les del joc real (sense colors). */
 .hu-memo-note {
-  animation: huMemoPulse 1.6s ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .hu-memo-note { animation: none; }
+  /* negre per defecte; l'usuari aprèn la POSICIÓ sense pistes de color */
 }
 
 /* Mòbil: target-info més petit, cap al centre del grid-2col */

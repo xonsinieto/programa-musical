@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v20-memobar";
+const CACHE = "lectura-notes-v21-caca-clean";
 const FILES = [
   "./",
   "./index.html",

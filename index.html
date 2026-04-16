@@ -442,22 +442,8 @@
       </div>
 
       <div id="hu-game-container">
-        <!-- Barra translúcida de memorització: es veu el pentagrama al darrere -->
-        <div id="hu-memo-bar" class="hu-memo-bar hidden">
-          <div class="hu-memo-text">
-            <span class="hu-memo-label">Memoritza els</span>
-            <strong id="hu-memo-target">DO</strong>
-            <span class="hu-memo-hint">· mira les notes cian al pentagrama</span>
-          </div>
-          <button id="hu-start-btn" class="big-start hu-memo-start">Començar</button>
-        </div>
-        <!-- Overlay només per estats de fi de partida (fallat / puja nivell / guanyat) -->
+        <!-- Només celebracions (level-up / guanyat): NO tapa notes durant memoritzar ni fallar -->
         <div id="hu-overlay" class="hidden">
-          <div id="hu-ov-fail" class="sp-ov-panel hidden">
-            <h2>Has fallat</h2>
-            <p id="hu-ov-fail-sub"></p>
-            <button id="hu-retry-btn" class="big-start">Torna-ho a provar</button>
-          </div>
           <div id="hu-ov-levelup" class="sp-ov-panel hidden">
             <h2 id="hu-lvlup-title">Velocitat 1 superada!</h2>
             <p id="hu-lvlup-sub">Avances a la velocitat 2</p>
@@ -468,6 +454,25 @@
             <button id="hu-restart-btn" class="big-start">Jugar de nou</button>
           </div>
         </div>
+      </div>
+
+      <!-- Barres INFORMATIVES FORA del pentagrama, no tapen cap nota -->
+      <div id="hu-memo-bar" class="hu-info-bar hidden">
+        <div class="hu-info-text">
+          <span class="hu-info-label">Memoritza els</span>
+          <strong id="hu-memo-target">DO</strong>
+        </div>
+        <button id="hu-start-btn" class="big-start hu-info-start">Començar</button>
+      </div>
+
+      <div id="hu-retry-bar" class="hu-info-bar hu-info-bar-fail hidden">
+        <div class="hu-info-text">
+          <span class="hu-info-label">Has fallat — era</span>
+          <strong id="hu-fail-name">—</strong>
+          <span class="hu-info-score" id="hu-fail-score">0/30</span>
+          <span class="hu-info-best" id="hu-fail-best"></span>
+        </div>
+        <button id="hu-retry-btn" class="big-start hu-info-start">Torna-ho a provar</button>
       </div>
 
       <div id="hu-feedback" class="feedback"></div>
