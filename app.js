@@ -1,6 +1,41 @@
 (function () {
   const VF = Vex.Flow;
 
+  // ======================================================
+  // EFECTES VISUALS GLOBALS (ripples, bursts, shakes, pop)
+  // ======================================================
+
+  // Ripple universal en qualsevol botó clicable
+  const RIPPLE_SELECTOR = ".note-btn, .big-start, .big-btn, nav.tabs .tab, #new-note-btn, #mic-btn, #xml-load-btn, .controls button, .profile-bar button, .sp-note-btn";
+  document.addEventListener("pointerdown", (e) => {
+    const btn = e.target.closest(RIPPLE_SELECTOR);
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const ripple = document.createElement("span");
+    ripple.className = "ripple-layer";
+    ripple.style.setProperty("--rx", (e.clientX - rect.left) + "px");
+    ripple.style.setProperty("--ry", (e.clientY - rect.top) + "px");
+    const prev = getComputedStyle(btn).position;
+    if (prev === "static") btn.style.position = "relative";
+    btn.style.overflow = "hidden";
+    btn.appendChild(ripple);
+    setTimeout(() => ripple.remove(), 720);
+  }, { passive: true });
+
+  function flashClass(el, cls, ms) {
+    if (!el) return;
+    el.classList.remove(cls);
+    // força reflow perquè l'animació es torni a disparar
+    void el.offsetWidth;
+    el.classList.add(cls);
+    setTimeout(() => el.classList.remove(cls), ms);
+  }
+
+  function popFeedback(el) { flashClass(el, "pop", 400); }
+  function burstStaff(el) { flashClass(el, "burst-correct", 720); }
+  function shakeElement(el) { flashClass(el, "shake-wrong", 520); }
+  function tickCounter(el) { flashClass(el, "counter-tick", 520); }
+
   // Cançons completes amb durades. Durades: "w"=rodona, "h"=blanca,
   // "q"=negra, "8"=corxera, "16"=semicorxera. Clef per cada nota.
   const SONGS = [
@@ -671,6 +706,8 @@
       step.status = "correct";
       feedbackEl.textContent = "Correcte!";
       feedbackEl.className   = "feedback correct";
+      popFeedback(feedbackEl);
+      burstStaff(staffContainer);
       btn.classList.add("correct-flash");
       playNote(step.note);
       recordTrainAnswer(step.clef, step.note, true);
@@ -682,6 +719,8 @@
       step.status = "wrong";
       feedbackEl.textContent = `Era ${correctCa.toUpperCase()}`;
       feedbackEl.className   = "feedback wrong";
+      popFeedback(feedbackEl);
+      shakeElement(staffContainer);
       btn.classList.add("wrong-flash");
       playErrorSound();
       recordTrainAnswer(step.clef, step.note, false);
@@ -689,6 +728,8 @@
       setTimeout(advance, 1200);
     }
     updateStats();
+    tickCounter(correctCountEl);
+    tickCounter(wrongCountEl);
   }
 
   function startRound() {
@@ -1668,6 +1709,7 @@
     fcRevealed = true;
     const name = NOTE_NAMES_CA[noteLetter(fcCurrent.note)].toUpperCase();
     fcAnswerEl.textContent = name;
+    flashClass(fcAnswerEl, "revealed", 720);
     fcRevealBtn.disabled = true;
     fcKnewBtn.disabled = false;
     fcDidntBtn.disabled = false;
@@ -2004,11 +2046,14 @@
       btn.classList.add("correct-flash");
       playNote(target.note);
       spColorNote(target.el, "#27ae60");
+      burstStaff(spContainer);
       const el = target.el;
       setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 160);
       const idx = spActive.indexOf(target);
       if (idx >= 0) spActive.splice(idx, 1);
       spUpdateStats();
+      tickCounter(spCorrectEl);
+      tickCounter(spStreakEl);
       setTimeout(() => {
         spNoteButtons.forEach(b => b.classList.remove("correct-flash"));
       }, 200);
@@ -2018,6 +2063,8 @@
     } else {
       spWrong++;
       btn.classList.add("wrong-flash");
+      shakeElement(spContainer);
+      tickCounter(spWrongEl);
       spUpdateStats();
       spOnFail(target);
     }
