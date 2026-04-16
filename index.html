@@ -21,8 +21,49 @@
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 </head>
 <body>
+  <!-- Cursor glow (seguirà el ratolí) -->
+  <div class="cursor-glow" id="cursor-glow"></div>
+
+  <!-- SVG noise filter (aplicat globalment via CSS) -->
+  <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+    <defs>
+      <filter id="noise-grain">
+        <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/>
+        <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.04 0"/>
+      </filter>
+    </defs>
+  </svg>
+
   <header>
-    <h1>Entrenador de Lectura de Notes <span class="author">by Alfons Vigas</span></h1>
+    <div class="hero-tag">
+      <span class="hero-tag-dot"></span>
+      <span>Sistema d'aprenentatge musical · v2</span>
+    </div>
+    <h1>
+      <span class="hero-word">Entrenador</span>
+      <span class="hero-word hero-word--italic">de</span>
+      <span class="hero-word hero-word--bright">Lectura</span>
+      <span class="hero-word">de Notes</span>
+      <span class="author">by Alfons Vigas</span>
+    </h1>
+
+    <!-- Marquee musical terms -->
+    <div class="hero-marquee" aria-hidden="true">
+      <div class="hero-marquee-track">
+        <span>♪ DO — RE — MI — FA — SOL — LA — SI</span>
+        <span>♫ PENTAGRAMA</span>
+        <span>◆ CLAU DE SOL</span>
+        <span>◆ CLAU DE FA</span>
+        <span>♪ NEGRES · BLANQUES · RODONES · CORXERES</span>
+        <span>◆ LLEGIR · TOCAR · APRENDRE</span>
+        <span>♪ DO — RE — MI — FA — SOL — LA — SI</span>
+        <span>♫ PENTAGRAMA</span>
+        <span>◆ CLAU DE SOL</span>
+        <span>◆ CLAU DE FA</span>
+        <span>♪ NEGRES · BLANQUES · RODONES · CORXERES</span>
+        <span>◆ LLEGIR · TOCAR · APRENDRE</span>
+      </div>
+    </div>
     <nav class="tabs">
       <button class="tab active" data-screen="reference">Referència</button>
       <button class="tab" data-screen="train">Entrenament</button>
@@ -249,6 +290,23 @@
     </div>
   </div>
 
+  <script>
+    // Cursor glow només en no-touch
+    (function () {
+      if (window.matchMedia && window.matchMedia("(hover: none)").matches) return;
+      var glow = document.getElementById("cursor-glow");
+      if (!glow) return;
+      var tx = 0, ty = 0, cx = 0, cy = 0;
+      function raf() {
+        cx += (tx - cx) * 0.18;
+        cy += (ty - cy) * 0.18;
+        glow.style.transform = "translate3d(" + cx + "px," + cy + "px,0) translate(-50%,-50%)";
+        requestAnimationFrame(raf);
+      }
+      document.addEventListener("pointermove", function (e) { tx = e.clientX; ty = e.clientY; }, { passive: true });
+      requestAnimationFrame(raf);
+    })();
+  </script>
   <script src="app.js"></script>
   <script>
     if ("serviceWorker" in navigator) {
