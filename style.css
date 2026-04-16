@@ -1,3 +1,23 @@
+:root {
+  --primary: #3498db;
+  --primary-dark: #2980b9;
+  --primary-soft: #E3F2FD;
+  --success: #27ae60;
+  --error: #e74c3c;
+  --warm: #F5E0E8;
+  --bg: #F4F6FA;
+  --card-bg: #ffffff;
+  --text: #2C3E50;
+  --text-soft: #6B7280;
+  --border: #E5E7EB;
+  --radius-sm: 10px;
+  --radius: 16px;
+  --radius-lg: 24px;
+  --shadow-clay: 6px 6px 14px rgba(44, 62, 80, 0.08), -3px -3px 10px rgba(255, 255, 255, 0.9);
+  --shadow-clay-inset: inset 2px 2px 6px rgba(44, 62, 80, 0.06), inset -2px -2px 6px rgba(255, 255, 255, 0.9);
+  --shadow-soft: 0 4px 14px rgba(52, 152, 219, 0.12);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -5,23 +25,27 @@
 html, body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: #f5f6fa;
-  color: #222;
+  font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  background: var(--bg);
+  color: var(--text);
   -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
 
 header {
-  background: #2c3e50;
+  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
   color: #fff;
   padding: 16px 20px;
   text-align: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
 }
 
 header h1 {
   margin: 0 0 12px 0;
   font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: 0.2px;
 }
 
 header h1 .author {
@@ -57,34 +81,50 @@ nav.tabs {
 }
 
 nav.tabs .tab {
-  background: rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.12);
   color: #fff;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 8px;
+  border: 2px solid rgba(255,255,255,0.08);
+  padding: 10px 18px;
+  border-radius: 14px;
   cursor: pointer;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
+  font-family: inherit;
+  letter-spacing: 0.2px;
+  transition: all 200ms ease;
+  min-height: 44px;
+}
+
+nav.tabs .tab:hover {
+  background: rgba(255,255,255,0.2);
+  transform: translateY(-1px);
 }
 
 nav.tabs .tab.active {
-  background: #3498db;
+  background: var(--primary);
+  border-color: var(--primary-dark);
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+  transform: translateY(-1px);
+}
+
+nav.tabs .tab:active {
+  transform: translateY(0);
 }
 
 .screen { display: none; }
 .screen.active { display: block; }
 
 .profile-bar {
-  background: #3498db;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   color: #fff;
-  padding: 8px 16px;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 1rem;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.25);
 }
 
 .profile-bar .profile-label {
@@ -162,8 +202,8 @@ nav.tabs .tab.active {
 }
 
 #ref-staff-container {
-  background: #fff;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  background: var(--card-bg);
+  box-shadow: var(--shadow-clay);
   padding: 30px 0;
   overflow: hidden;
   margin-bottom: 20px;
@@ -174,6 +214,8 @@ nav.tabs .tab.active {
   margin-right: -50vw;
   right: 50%;
   border-radius: 0;
+  border-top: 3px solid var(--primary-soft);
+  border-bottom: 3px solid var(--primary-soft);
 }
 
 #ref-staff-container svg {
@@ -217,10 +259,10 @@ nav.tabs .tab.active {
 /* Flashcards & Speed shared staff containers */
 #fc-staff-container,
 #sp-game-container {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-  padding: 20px 0;
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-clay);
+  padding: 24px 0;
   min-height: 480px;
   margin-bottom: 12px;
 }
@@ -263,10 +305,11 @@ nav.tabs .tab.active {
 .sp-ov-panel {
   text-align: center;
   max-width: 600px;
-  background: #ffffff;
-  padding: 28px 32px;
-  border-radius: 16px;
-  box-shadow: 0 6px 28px rgba(0,0,0,0.12);
+  background: var(--card-bg);
+  padding: 32px 36px;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 32px rgba(44,62,80,0.15), 0 2px 8px rgba(52,152,219,0.1);
+  border: 3px solid var(--primary-soft);
 }
 
 .sp-ov-panel.hidden {
@@ -328,19 +371,26 @@ nav.tabs .tab.active {
 
 .big-start {
   font-size: 1.6rem;
-  font-weight: 700;
+  font-weight: 800;
+  font-family: inherit;
   padding: 18px 48px;
-  background: #3498db;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   color: #fff;
   border: none;
-  border-radius: 14px;
+  border-radius: var(--radius);
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(52,152,219,0.35);
-  transition: transform 0.08s;
+  box-shadow: 0 6px 18px rgba(52,152,219,0.4), inset 0 1px 0 rgba(255,255,255,0.3);
+  transition: all 200ms ease;
+  min-height: 56px;
+}
+
+.big-start:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(52,152,219,0.5), inset 0 1px 0 rgba(255,255,255,0.3);
 }
 
 .big-start:active {
-  transform: scale(0.97);
+  transform: translateY(0);
 }
 
 .fc-answer {
@@ -554,17 +604,42 @@ nav.tabs .tab.active {
 
 .controls select,
 .controls button {
-  font-size: 1rem;
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: none;
+  font-size: 0.95rem;
+  font-family: inherit;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 2px solid var(--border);
   cursor: pointer;
+  background: #fff;
+  color: var(--text);
+  font-weight: 600;
+  min-height: 44px;
+  transition: all 150ms ease;
+}
+
+.controls select:hover,
+.controls button:hover {
+  border-color: var(--primary);
+}
+
+.controls select:focus,
+.controls button:focus {
+  outline: 3px solid rgba(52, 152, 219, 0.3);
+  outline-offset: 2px;
 }
 
 #new-note-btn {
-  background: #3498db;
+  background: var(--primary);
   color: #fff;
-  font-weight: 600;
+  border-color: var(--primary-dark);
+  font-weight: 700;
+  box-shadow: 0 3px 8px rgba(52, 152, 219, 0.3);
+}
+
+#new-note-btn:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(52, 152, 219, 0.4);
 }
 
 #mic-btn {
@@ -601,7 +676,8 @@ nav.tabs .tab.active {
 }
 
 #new-note-btn:active {
-  background: #2980b9;
+  background: var(--primary-dark);
+  transform: translateY(0);
 }
 
 main {
@@ -611,13 +687,13 @@ main {
 }
 
 #staff-container {
-  background: #fff;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-  padding: 20px 0;
+  background: var(--card-bg);
+  box-shadow: var(--shadow-clay);
+  padding: 24px 0;
   display: block;
   min-height: 480px;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   width: min(90vw, 1200px);
   position: relative;
   left: 50%;
@@ -648,15 +724,29 @@ main {
 }
 
 .note-btn {
-  padding: 20px 0;
-  font-size: 1.3rem;
-  font-weight: 700;
-  background: #fff;
-  border: 2px solid #3498db;
-  color: #2c3e50;
-  border-radius: 12px;
+  padding: 22px 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-family: inherit;
+  background: var(--card-bg);
+  border: 3px solid var(--primary);
+  color: var(--text);
+  border-radius: var(--radius);
   cursor: pointer;
-  transition: transform 0.05s, background 0.15s;
+  transition: all 200ms ease;
+  box-shadow: 0 4px 10px rgba(52, 152, 219, 0.12), -2px -2px 8px rgba(255,255,255,0.9);
+  min-height: 60px;
+}
+
+.note-btn:hover {
+  background: var(--primary-soft);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(52, 152, 219, 0.22);
+}
+
+.note-btn:focus {
+  outline: 3px solid rgba(52, 152, 219, 0.35);
+  outline-offset: 2px;
 }
 
 .note-btn:active {
@@ -680,11 +770,13 @@ main {
 .stats {
   display: flex;
   justify-content: space-around;
-  background: #fff;
-  padding: 14px;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  background: var(--card-bg);
+  padding: 16px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-clay);
   font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-soft);
 }
 
 .stats strong {

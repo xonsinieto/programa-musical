@@ -1,7 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Read(//c/Users/alfon/OneDrive/MUSICA/PIANO/PARTITURES/**)"
+      "Read(//c/Users/alfon/OneDrive/MUSICA/PIANO/PARTITURES/**)",
+      "WebFetch(domain:ui-ux-pro-max-skill.nextlevelbuilder.io)",
+      "Bash(curl -sL \"https://ui-ux-pro-max-skill.nextlevelbuilder.io\")",
+      "Bash(curl -sL \"https://ui-ux-pro-max-skill.nextlevelbuilder.io/assets/index-DybJ-FQd.js\")",
+      "Bash(curl -sL \"https://api.github.com/repos/nextlevelbuilder/ui-ux-pro-max-skill\")",
+      "Bash(curl -sL \"https://api.github.com/repos/nextlevelbuilder/ui-ux-pro-max-skill/contents\")",
+      "Bash(python -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(d['name'], d['type']\\) for d in data]\")",
+      "Bash(curl -sL \"https://api.github.com/repos/nextlevelbuilder/ui-ux-pro-max-skill/contents/.claude\")",
+      "Bash(python -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(d['name'], d['type'], d.get\\('path',''\\)\\) for d in data]\")",
+      "Bash(curl -sL \"https://api.github.com/repos/nextlevelbuilder/ui-ux-pro-max-skill/contents/.claude/skills\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/nextlevelbuilder/ui-ux-pro-max-skill/main/README.md\")",
+      "Read(//c/Users/alfon/.claude/skills/ui-ux-pro-max/data/**)"
     ]
   }
 }
