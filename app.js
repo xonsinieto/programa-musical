@@ -2895,15 +2895,22 @@
     }
     spUpdateStats();
 
-    let extra = "";
-    if (spCorrect > 0 && isImprovement) {
-      extra = " — 🏆 Nou rècord vel " + spCurrentSpeed + ": " + spCorrect + "/" + SP_STREAK_TO_ADVANCE;
+    // Omplim els 3 elements separats del retry bar (nom, score, millor)
+    const scoreEl = document.getElementById("sp-fail-score");
+    const bestEl  = document.getElementById("sp-fail-best");
+    scoreEl.textContent = spCorrect + "/" + SP_STREAK_TO_ADVANCE;
+    scoreEl.classList.remove("is-record", "is-tie");
+    if (isImprovement && spCorrect > 0) {
+      scoreEl.classList.add("is-record");
+      bestEl.textContent = "🏆 Nou rècord vel " + spCurrentSpeed;
     } else if (isTie) {
-      extra = " — 👍 Empat (" + spCorrect + "/" + SP_STREAK_TO_ADVANCE + ")";
+      scoreEl.classList.add("is-tie");
+      bestEl.textContent = "👍 Empat vel " + spCurrentSpeed;
     } else if (prevBest > 0) {
-      extra = " — " + spCorrect + " (millor vel " + spCurrentSpeed + ": " + prevBest + ")";
+      bestEl.textContent = "millor: " + prevBest + "/" + SP_STREAK_TO_ADVANCE;
+    } else {
+      bestEl.textContent = "";
     }
-    document.getElementById("sp-fail-name").textContent = name + extra;
     spRetryBar.classList.remove("hidden");
 
     setTimeout(() => {
@@ -3612,11 +3619,14 @@
       mo2.observe(sel, { attributes: true, attributeFilter: ["disabled"] });
 
       // Inserim al DOM: wrap agafa el lloc del select, el select queda ocult dins del wrap.
+      // IMPORTANT: el popover es penja directament al <body>, NO dins del wrap, perquè
+      // ancestres com .screen.active > .controls tenen `transform` (animació gentleRise)
+      // que trenca `position:fixed` (el converteix en relatiu a aquell ancestre).
       const parent = sel.parentNode;
       parent.insertBefore(wrap, sel);
       wrap.appendChild(trigger);
-      wrap.appendChild(pop);
       wrap.appendChild(sel);
+      document.body.appendChild(pop);
       sel.setAttribute("aria-hidden", "true");
       sel.tabIndex = -1;
 
@@ -3633,7 +3643,9 @@
     if (!window.__xselGlobalsWired) {
       window.__xselGlobalsWired = true;
       document.addEventListener("click", (e) => {
+        // Ignorem clicks dins d'un trigger o d'un popover (el popover ara viu al <body>)
         if (e.target.closest(".xsel")) return;
+        if (e.target.closest(".xsel-popover")) return;
         closeAll();
       });
       document.addEventListener("keydown", (e) => {
