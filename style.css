@@ -1893,12 +1893,13 @@ main {
     padding: 0 3px;
     margin: 4px auto;
   }
-  /* Controls en UNA SOLA FILA (com a web) amb scroll horitzontal si cal.
-     Molt compactats per cabre a pantalles estretes (~360-380px). */
+  /* Controls: WRAP automàtic si no caben → res queda amagat darrere de scroll.
+     Triggers amb valor truncat ('Les dues…') per minimitzar amplada. */
   .controls {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: center;
     gap: 4px;
     padding: 5px 6px;
     margin: 0 3px 5px;
@@ -1909,29 +1910,25 @@ main {
     border-radius: 11px;
     box-shadow: 0 6px 20px rgba(0,0,0,0.35);
     color: var(--ink);
-    overflow-x: auto;
-    overflow-y: visible;
-    scrollbar-width: none;
   }
-  .controls::-webkit-scrollbar { display: none; }
-  /* Al mòbil amagem el text de l'etiqueta ('Clau:', 'Nivell:', 'Mode:') perquè
-     el valor triat del select ja indica de què és cada cosa i així tot cap en
-     una pantalla estreta sense scroll lateral. */
+  /* Al mòbil amagem el text literal del <label> ('Clau:', 'Nivell:', 'Mode:')
+     — el valor triat del select ja indica de què és. font-size:0 amaga el text
+     directe; els fills restauren font size. */
   .controls label {
     display: inline-flex;
     align-items: center;
     gap: 0;
-    flex-shrink: 0;
+    flex-shrink: 1;
     min-width: 0;
-    font-size: 0; /* oculta text directe del label */
+    font-size: 0;
     white-space: nowrap;
   }
   .controls label > * {
-    font-size: 0.66rem; /* restaurat per fills (select, xsel, input, span) */
+    font-size: 0.66rem;
   }
   .controls select,
   .controls input {
-    flex-shrink: 0;
+    flex-shrink: 1;
     min-width: 0;
     max-width: none;
     font-size: 0.66rem;
@@ -1943,12 +1940,12 @@ main {
     min-height: 28px;
   }
   .controls .xsel {
-    flex-shrink: 0;
+    flex-shrink: 1;
     min-width: 0;
-    max-width: none;
+    max-width: 110px;
   }
   .controls .xsel-trigger {
-    width: auto;
+    width: 100%;
     font-size: 0.66rem;
     padding: 4px 7px;
     min-height: 28px;
@@ -1956,8 +1953,17 @@ main {
     gap: 4px;
     background: rgba(5, 7, 15, 0.6);
     white-space: nowrap;
+    overflow: hidden;
+  }
+  /* Trunca el valor llarg amb ellipsis perquè càpiga */
+  .controls .xsel-value {
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .controls .xsel-chevron {
+    flex: 0 0 auto;
     width: 6px;
     height: 6px;
     border-width: 1.5px;
