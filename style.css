@@ -2669,6 +2669,26 @@ main {
   letter-spacing: 0.04em;
 }
 .hu-info-best:empty { display: none; }
+
+/* Hint addicional al memo-bar: "al joc clica només les DO que escombrin" */
+.hu-info-hint {
+  font-size: 0.78rem;
+  color: rgba(232, 236, 241, 0.6);
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+.hu-info-hint strong {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.95rem;
+  background: linear-gradient(100deg, #00F0FF, #FF10F0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  font-style: normal;
+  letter-spacing: 0;
+}
 .hu-info-start {
   font-size: 0.95rem !important;
   padding: 10px 24px !important;
@@ -2686,6 +2706,8 @@ main {
   .hu-info-bar-fail strong { font-size: 1rem; }
   .hu-info-score { font-size: 0.72rem; padding: 2px 7px; }
   .hu-info-best { font-size: 0.62rem; }
+  .hu-info-hint { font-size: 0.64rem; }
+  .hu-info-hint strong { font-size: 0.78rem; }
   .hu-info-start { font-size: 0.76rem !important; padding: 6px 12px !important; min-height: 28px !important; }
 }
 

@@ -3413,9 +3413,11 @@
     const caName = NOTE_NAMES_CA[letter]; // "do", "re", ...
     const caUpper = caName.toUpperCase();
     if (huTargetLabelEl) huTargetLabelEl.textContent = caUpper;
-    // Actualitza el text de la barra de memorització ("Memoritza els DO/RE/...")
+    // Actualitza els textos de la barra de memorització ("Memoritza els XX · al joc clica només les XX...")
     const memoTargetEl = document.getElementById("hu-memo-target");
+    const memoTargetHintEl = document.getElementById("hu-memo-target-hint");
     if (memoTargetEl) memoTargetEl.textContent = caUpper;
+    if (memoTargetHintEl) memoTargetHintEl.textContent = caUpper;
     huTargetButtons.forEach(b => b.classList.toggle("is-selected", b.dataset.note === caName));
     // Canvi de diana → reinicia partida (nou memoritzar)
     huCurrentSpeed = parseInt(huSpeedSelect.value, 10) || huCurrentSpeed;
