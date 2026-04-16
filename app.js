@@ -36,6 +36,112 @@
   function shakeElement(el) { flashClass(el, "shake-wrong", 520); }
   function tickCounter(el) { flashClass(el, "counter-tick", 520); }
 
+  // ---------- PARALLAX COSMIC BG ----------
+  if (!window.matchMedia("(hover: none)").matches) {
+    let tx = 0, ty = 0, cx = 0, cy = 0;
+    function rafParallax() {
+      cx += (tx - cx) * 0.06;
+      cy += (ty - cy) * 0.06;
+      document.documentElement.style.setProperty("--parallax-x", cx.toFixed(1) + "px");
+      document.documentElement.style.setProperty("--parallax-y", cy.toFixed(1) + "px");
+      requestAnimationFrame(rafParallax);
+    }
+    document.addEventListener("pointermove", (e) => {
+      const halfW = window.innerWidth / 2;
+      const halfH = window.innerHeight / 2;
+      tx = ((e.clientX - halfW) / halfW) * 18;
+      ty = ((e.clientY - halfH) / halfH) * 18;
+    }, { passive: true });
+    requestAnimationFrame(rafParallax);
+  }
+
+  // ---------- CONFETTI / PARTICLE BURST ----------
+  function spawnConfetti(opts) {
+    opts = opts || {};
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:10000";
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    document.body.appendChild(canvas);
+    const ctx = canvas.getContext("2d");
+    const colors = opts.colors || ["#00F0FF", "#FF10F0", "#A855F7", "#FFB800", "#00FF94"];
+    const n = opts.count || 80;
+    const ox = opts.x != null ? opts.x : window.innerWidth / 2;
+    const oy = opts.y != null ? opts.y : window.innerHeight / 2;
+    const particles = [];
+    for (let i = 0; i < n; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 6 + Math.random() * 12;
+      particles.push({
+        x: ox, y: oy,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        size: 3 + Math.random() * 5,
+        life: 1,
+        rotation: Math.random() * Math.PI,
+        rotSpeed: (Math.random() - 0.5) * 0.3,
+        drag: 0.97
+      });
+    }
+    let frames = 0;
+    function tick() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let alive = false;
+      for (const p of particles) {
+        p.vx *= p.drag;
+        p.vy = p.vy * p.drag + 0.45;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rotation += p.rotSpeed;
+        p.life -= 0.013;
+        if (p.life > 0) {
+          alive = true;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rotation);
+          ctx.globalAlpha = Math.max(0, p.life);
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 14;
+          ctx.fillRect(-p.size / 2, -p.size, p.size, p.size * 2);
+          ctx.restore();
+        }
+      }
+      if (alive && frames < 200) {
+        frames++;
+        requestAnimationFrame(tick);
+      } else {
+        canvas.remove();
+      }
+    }
+    tick();
+  }
+
+  // Petit sparkle burst (per correct answers - menys intens que confetti)
+  function spawnSparkles(rect) {
+    spawnConfetti({
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+      count: 22,
+      colors: ["#00F0FF", "#00FF94", "#FFB800"]
+    });
+  }
+
+  // ---------- TOAST NOTIFICATION ----------
+  function showToast(msg, type) {
+    const toast = document.createElement("div");
+    toast.className = "toast toast-" + (type || "info");
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add("toast-show"));
+    setTimeout(() => {
+      toast.classList.remove("toast-show");
+      setTimeout(() => toast.remove(), 320);
+    }, 2800);
+  }
+
   // Cançons completes amb durades. Durades: "w"=rodona, "h"=blanca,
   // "q"=negra, "8"=corxera, "16"=semicorxera. Clef per cada nota.
   const SONGS = [
@@ -662,16 +768,17 @@
         const diff = best ? elapsed - best : null;
 
         if (!cleanRun) {
-          // Amb errors: NO compta com a millor, només mostrem temps i info
           message = `Temps: ${formatSec(elapsed)} — ${roundErrors} error${roundErrors > 1 ? "s" : ""}` +
                     (best ? `  (millor sense errors: ${formatSec(best)})` : "");
         } else if (!best || elapsed < best - 0.05) {
           setBestTime(key, elapsed);
           message = `🎉 ${formatSec(elapsed)} — Bé! Estàs millorant!`;
           playCongratulations();
+          spawnConfetti({ count: 70 });
         } else if (diff !== null && Math.abs(diff) <= 0.1) {
           message = `🎉 ${formatSec(elapsed)} — Empat amb el millor!`;
           playCongratulations();
+          spawnConfetti({ count: 50 });
         } else if (diff !== null && diff <= 3) {
           message = `👍 ${formatSec(elapsed)} — Bé, segueix així! (millor: ${formatSec(best)})`;
           playEncouragement();
@@ -877,7 +984,7 @@
       updateSongVisibility();
       startRound();
 
-      alert(`Partitura "${songName}" carregada: ${notes.length} notes.`);
+      showToast(`✔ Partitura "${songName}" carregada · ${notes.length} notes`, "success");
     } catch (e) {
       alert("Error carregant la partitura: " + (e.message || e));
     }
@@ -2129,6 +2236,9 @@
     const prevBestForLevel = getSpBest();
     if (spCorrect > prevBestForLevel) setSpBest(spCorrect);
 
+    // Celebració visual al level up
+    spawnConfetti({ count: 80 });
+
     const passed = spCurrentSpeed;
     spCurrentSpeed++;
     if (spCurrentSpeed > spMaxSpeedThisRun) spMaxSpeedThisRun = spCurrentSpeed;
@@ -2151,6 +2261,10 @@
     spState = "won";
     if (spRAF) cancelAnimationFrame(spRAF);
     spShowOverlay(spOvWin);
+    // Triple confetti burst a posicions diferents per celebració completa
+    spawnConfetti({ count: 100 });
+    setTimeout(() => spawnConfetti({ x: window.innerWidth * 0.25, y: window.innerHeight * 0.4, count: 60 }), 250);
+    setTimeout(() => spawnConfetti({ x: window.innerWidth * 0.75, y: window.innerHeight * 0.4, count: 60 }), 500);
   }
 
   function spEnterPlay() {

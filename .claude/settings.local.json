@@ -17,7 +17,8 @@
       "Bash(curl -sL \"https://api.github.com/repos/anthropics/skills/contents/skills\")",
       "Bash(curl -sL \"https://raw.githubusercontent.com/anthropics/skills/main/README.md\")",
       "Read(//c/Users/alfon/.claude/skills/frontend-design/**)",
-      "WebFetch(domain:readymag.com)"
+      "WebFetch(domain:readymag.com)",
+      "Bash(python)"
     ],
     "additionalDirectories": [
       "\\tmp"
