@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v23-hitzone";
+const CACHE = "lectura-notes-v24-mobile-row";
 const FILES = [
   "./",
   "./index.html",

@@ -6,7 +6,7 @@
   // ======================================================
 
   // Ripple universal en qualsevol botó clicable
-  const RIPPLE_SELECTOR = ".note-btn, .big-start, .big-btn, nav.tabs .tab, #new-note-btn, #mic-btn, #xml-load-btn, .controls button, .profile-bar button, .sp-note-btn";
+  const RIPPLE_SELECTOR = ".note-btn, .big-start, .big-btn, nav.tabs .tab, #new-note-btn, #mic-btn, .controls button, .profile-bar button, .sp-note-btn";
   document.addEventListener("pointerdown", (e) => {
     const btn = e.target.closest(RIPPLE_SELECTOR);
     if (!btn) return;
@@ -934,54 +934,7 @@
     return parseMusicXML(xmlText);
   }
 
-  const xmlLoadBtn   = document.getElementById("xml-load-btn");
-  const xmlFileInput = document.getElementById("xml-file-input");
-
-  xmlLoadBtn.addEventListener("click", () => xmlFileInput.click());
-
-  xmlFileInput.addEventListener("change", async (ev) => {
-    const file = ev.target.files[0];
-    if (!file) return;
-    try {
-      const notes = await loadMusicXmlFile(file);
-      if (!notes || notes.length === 0) {
-        alert("No s'han trobat notes vàlides a aquesta partitura.\n" +
-              "(Les notes amb sostinguts/bemolls es salten — el sistema només suporta notes naturals.)");
-        xmlFileInput.value = "";
-        return;
-      }
-      // Crea una cançó personalitzada temporal
-      const id = "custom-" + Date.now();
-      const songName = file.name.replace(/\.(xml|musicxml|mxl)$/i, "");
-      const song = { id, name: "📄 " + songName, notes };
-
-      // Elimina cançons custom anteriors (evita duplicats)
-      for (let i = SONGS.length - 1; i >= 0; i--) {
-        if (SONGS[i].id.startsWith("custom-")) SONGS.splice(i, 1);
-      }
-      SONGS.push(song);
-
-      // Refresca el selector de cançons
-      songSelect.innerHTML = "";
-      SONGS.forEach(s => {
-        const o = document.createElement("option");
-        o.value = s.id;
-        o.textContent = s.name;
-        songSelect.appendChild(o);
-      });
-      songSelect.value = id;
-
-      // Activa el mode cançó i inicia
-      modeSelect.value = "song";
-      updateSongVisibility();
-      startRound();
-
-      showToast(`✔ Partitura "${songName}" carregada · ${notes.length} notes`, "success");
-    } catch (e) {
-      alert("Error carregant la partitura: " + (e.message || e));
-    }
-    xmlFileInput.value = "";
-  });
+  // (Carregador de partitures MusicXML tret temporalment — es reprendrà més endavant)
 
   function updateSongVisibility() {
     songLabel.style.display = modeSelect.value === "song" ? "" : "none";

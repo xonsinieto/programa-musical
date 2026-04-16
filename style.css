@@ -1893,11 +1893,14 @@ main {
     padding: 0 3px;
     margin: 4px auto;
   }
+  /* Controls en UNA SOLA FILA amb scroll horitzontal si no caben (com a web),
+     igual per totes les pantalles */
   .controls {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 5px 8px;
-    padding: 8px 10px;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
     margin: 0 3px 6px;
     background: rgba(18, 22, 45, 0.55);
     backdrop-filter: blur(14px) saturate(1.2);
@@ -1905,46 +1908,52 @@ main {
     border: 1px solid var(--glass-border);
     border-radius: 12px;
     box-shadow: 0 6px 20px rgba(0,0,0,0.35);
-    font-size: 0.72rem;
-    align-items: center;
+    font-size: 0.66rem;
     color: var(--ink);
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none;
   }
+  .controls::-webkit-scrollbar { display: none; }
   .controls label {
-    display: flex;
-    justify-content: space-between;
+    display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
+    flex-shrink: 0;
     min-width: 0;
-    color: var(--ink-soft);
+    font-size: 0.56rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(232, 236, 241, 0.55);
+    white-space: nowrap;
   }
   .controls select,
   .controls input {
-    flex: 1 1 0;
+    flex-shrink: 0;
     min-width: 0;
-    max-width: 110px;
-    font-size: 0.78rem;
-    padding: 5px 10px;
+    max-width: none;
+    font-size: 0.74rem;
+    padding: 5px 8px;
     border: 1px solid var(--glass-border);
     border-radius: 8px;
     background: rgba(5, 7, 15, 0.6);
     color: var(--ink);
-    min-height: 32px;
+    min-height: 30px;
   }
-  /* El trigger del custom dropdown dins de .controls ha d'ocupar la mateixa
-     mida que el select antic per no trencar el grid 2-cols */
   .controls .xsel {
-    flex: 1 1 0;
+    flex-shrink: 0;
     min-width: 0;
-    max-width: 130px;
+    max-width: none;
   }
   .controls .xsel-trigger {
-    width: 100%;
-    font-size: 0.76rem;
+    width: auto;
+    font-size: 0.72rem;
     padding: 5px 10px;
-    min-height: 32px;
+    min-height: 30px;
     border-radius: 8px;
-    gap: 6px;
+    gap: 5px;
     background: rgba(5, 7, 15, 0.6);
+    white-space: nowrap;
   }
   .controls .xsel-chevron {
     width: 7px;
@@ -1952,18 +1961,13 @@ main {
     border-width: 1.5px;
   }
   .controls button {
-    grid-column: 1 / -1;
-    justify-self: center;
-    width: auto;
-    min-width: 140px;
-    font-size: 0.68rem;
-    padding: 8px 18px;
+    flex-shrink: 0;
+    font-size: 0.64rem;
+    padding: 6px 14px;
+    min-height: 30px;
     font-weight: 700;
-    letter-spacing: 0.08em;
-  }
-  /* Excepció: Relàmpec té el seu propi .rl-controls (flex no grid) */
-  #screen-sightread .controls button {
-    grid-column: auto;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
   }
   .answer-buttons {
     grid-template-columns: repeat(7, 1fr);
@@ -1987,12 +1991,15 @@ main {
     font-size: 0.85rem;
     margin-left: 3px;
   }
+  /* Alçada suficient perquè el grand staff sencer (treble + clau de Fa) hi càpiga
+     amb escala 0.62: VF renderitza ~460px d'alçada intrínseca × 0.62 ≈ 285px.
+     Amb una mica de marge → 300px. */
   #staff-container,
   #fc-staff-container,
   #sp-game-container,
   #rl-staff-container {
-    min-height: 200px;
-    height: 200px;
+    min-height: 300px;
+    height: 300px;
     padding: 0;
     margin-bottom: 5px;
     overflow: hidden;
@@ -2004,7 +2011,7 @@ main {
   #fc-staff-container svg,
   #sp-game-container svg,
   #rl-staff-container svg {
-    transform: scale(0.58);
+    transform: scale(0.62);
     transform-origin: top left;
   }
   /* Referència: es rendereitza amb amplada mínima de 900px (moltes notes).
@@ -2737,15 +2744,15 @@ main {
   .hu-target-info strong {
     font-size: 1.05rem;
   }
-  /* El contenidor del joc compacta alçada al mòbil com Velocitat */
+  /* Caça: mateix criteri que els altres — grand staff sencer visible */
   #hu-game-container {
-    min-height: 240px;
-    height: 240px;
+    min-height: 300px;
+    height: 300px;
     padding: 0;
     overflow: hidden;
   }
   #hu-game-container svg {
-    transform: scale(0.56);
+    transform: scale(0.62);
     transform-origin: top left;
     width: 100%;
     height: auto;
