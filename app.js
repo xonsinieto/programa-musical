@@ -3072,8 +3072,11 @@
   const huTargetButtons = document.querySelectorAll(".hu-target-btn");
 
   const HU_BEST_KEY = "huntBestByProfile_v1";
+  // Mapeig del data-note del botó (català) a la lletra pitch (ús intern + NOTE_NAMES_CA)
+  const HU_CA_TO_LETTER = { do: "c", re: "d", mi: "e", fa: "f", sol: "g", la: "a", si: "b" };
+  const HU_LETTER_TO_CA = { c: "do", d: "re", e: "mi", f: "fa", g: "sol", a: "la", b: "si" };
 
-  let huTarget = "do";
+  let huTarget = "c"; // lletra pitch (c/d/e/f/g/a/b); per defecte Do
   let huState  = "idle"; // "idle" | "memorize" | "playing" | "paused" | "levelup" | "won"
   let huActive = [];
   let huSvg = null;
@@ -3232,7 +3235,7 @@
       if (n.state === "pending" && n.x < huHitLineX - 20) {
         if (noteLetter(n.note) === huTarget) {
           // Diana que se'ns ha escapat → game over
-          huFail(n, "Has deixat passar una " + huTarget.toUpperCase());
+          huFail(n, "Has deixat passar una " + NOTE_NAMES_CA[huTarget].toUpperCase());
           return;
         }
         // No-diana: només la eliminem
@@ -3427,9 +3430,12 @@
   }
 
   function huSetTarget(letter) {
+    // letter és la lletra pitch (c, d, e, f, g, a, b)
+    if (!NOTE_NAMES_CA[letter]) return; // protecció per si arriba un valor estrany
     huTarget = letter;
-    huTargetLabelEl.textContent = NOTE_NAMES_CA[letter].toUpperCase();
-    huTargetButtons.forEach(b => b.classList.toggle("is-selected", b.dataset.note === letter));
+    const caName = NOTE_NAMES_CA[letter]; // "do", "re", ...
+    huTargetLabelEl.textContent = caName.toUpperCase();
+    huTargetButtons.forEach(b => b.classList.toggle("is-selected", b.dataset.note === caName));
     // Canvi de diana → reinicia partida (nou memoritzar)
     huCurrentSpeed = parseInt(huSpeedSelect.value, 10) || huCurrentSpeed;
     huStreak = 0; huCorrect = 0;
@@ -3448,7 +3454,10 @@
   huRetryBtn.addEventListener("click", huRetry);
   huRestartBtn.addEventListener("click", huRestart);
   huTargetButtons.forEach(btn => {
-    btn.addEventListener("click", () => huSetTarget(btn.dataset.note));
+    btn.addEventListener("click", () => {
+      const letter = HU_CA_TO_LETTER[btn.dataset.note];
+      if (letter) huSetTarget(letter);
+    });
   });
   huClefSelect.addEventListener("change", () => huSetTarget(huTarget));
   huLevelSelect.addEventListener("change", () => huSetTarget(huTarget));
@@ -3548,6 +3557,9 @@
         });
       }
       function positionPop() {
+        // Si el popover no està en estat obert (per ex. closeAll l'ha tancat),
+        // no fem res — evita que scroll/resize "ressuscitin" un popover orfe.
+        if (!wrap.classList.contains("xsel-open")) return;
         // Posicionem el popover fix (en comptes de absolute) perquè no quedi
         // tallat per cap parent amb overflow:hidden (pentagrama, controls, etc.)
         const tr = trigger.getBoundingClientRect();

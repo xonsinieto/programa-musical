@@ -2,7 +2,26 @@
 <html lang="ca" style="background:#05070F">
 <head>
   <meta charset="UTF-8" />
-  <style>html,body{background:#05070F;color:#E8ECF1}</style>
+  <style>
+    html,body{background:#05070F;color:#E8ECF1;margin:0}
+    /* Splash d'entrada — inline perquè es vegi instantàniament sense esperar el CSS extern */
+    #app-splash{position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:radial-gradient(ellipse 800px 600px at 20% 20%,rgba(168,85,247,.42),transparent 55%),radial-gradient(ellipse 800px 600px at 80% 80%,rgba(0,240,255,.38),transparent 55%),radial-gradient(ellipse 700px 500px at 50% 95%,rgba(255,16,240,.32),transparent 60%),#05070F;transition:opacity .7s cubic-bezier(.5,0,.5,1),transform .7s cubic-bezier(.5,0,.5,1);pointer-events:none}
+    #app-splash.hidden{opacity:0;transform:scale(1.08)}
+    #app-splash .splash-aurora{position:absolute;inset:-20%;background:conic-gradient(from 0deg,rgba(0,240,255,.15),rgba(168,85,247,.12),rgba(255,16,240,.15),rgba(0,240,255,.15));animation:splAurora 9s linear infinite;filter:blur(60px);z-index:0}
+    @keyframes splAurora{to{transform:rotate(360deg)}}
+    #app-splash .splash-core{position:relative;display:flex;flex-direction:column;align-items:center;gap:20px;z-index:1}
+    #app-splash .splash-icon{width:108px;height:108px;filter:drop-shadow(0 0 50px rgba(0,240,255,.6)) drop-shadow(0 0 25px rgba(255,16,240,.4));animation:splIcon 1s cubic-bezier(.34,1.56,.64,1) both}
+    @keyframes splIcon{from{opacity:0;transform:rotate(-20deg) scale(.4)}60%{opacity:1;transform:rotate(4deg) scale(1.05)}to{transform:rotate(0) scale(1)}}
+    #app-splash .splash-title{font-family:'Unbounded','Inter',system-ui,sans-serif;font-weight:900;font-size:clamp(1.4rem,5vw,2.4rem);letter-spacing:-.02em;background:linear-gradient(100deg,#00F0FF,#FF10F0,#FFB800,#00F0FF);background-size:220% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:splShine 3s linear infinite,splRise .9s .35s cubic-bezier(.34,1.56,.64,1) both;text-align:center;padding:0 16px}
+    @keyframes splShine{to{background-position:220% 0}}
+    @keyframes splRise{from{opacity:0;transform:translateY(14px);filter:blur(6px)}to{opacity:1;transform:translateY(0);filter:blur(0)}}
+    #app-splash .splash-tag{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:.72rem;letter-spacing:.5em;text-transform:uppercase;color:rgba(232,236,241,.72);animation:splRise .9s .55s cubic-bezier(.34,1.56,.64,1) both}
+    #app-splash .splash-dots{display:flex;gap:8px;animation:splRise .9s .75s cubic-bezier(.34,1.56,.64,1) both}
+    #app-splash .splash-dots span{width:7px;height:7px;border-radius:50%;background:linear-gradient(135deg,#00F0FF,#FF10F0);animation:splDot 1.4s cubic-bezier(.4,0,.6,1) infinite}
+    #app-splash .splash-dots span:nth-child(2){animation-delay:.2s}
+    #app-splash .splash-dots span:nth-child(3){animation-delay:.4s}
+    @keyframes splDot{0%,40%,100%{transform:translateY(0);opacity:.4}20%{transform:translateY(-6px);opacity:1}}
+  </style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>Entrenador de Lectura de Notes</title>
   <link rel="manifest" href="manifest.json" />
@@ -22,6 +41,42 @@
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 </head>
 <body>
+  <!-- SPLASH D'ENTRADA (cosmic aurora + logo animat + títol brillant) -->
+  <div id="app-splash" aria-hidden="true">
+    <div class="splash-aurora"></div>
+    <div class="splash-core">
+      <svg class="splash-icon" viewBox="0 0 120 120" aria-hidden="true">
+        <defs>
+          <linearGradient id="splGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#00F0FF"/>
+            <stop offset="50%" stop-color="#A855F7"/>
+            <stop offset="100%" stop-color="#FF10F0"/>
+          </linearGradient>
+          <filter id="splGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4"/>
+          </filter>
+        </defs>
+        <!-- Glow halo -->
+        <ellipse cx="44" cy="84" rx="26" ry="20" fill="url(#splGrad)" filter="url(#splGlow)" opacity="0.7"/>
+        <!-- Stem -->
+        <rect x="62" y="22" width="5" height="66" rx="2" fill="url(#splGrad)"/>
+        <!-- Flag / tail -->
+        <path d="M 67 22 C 96 30, 104 55, 88 78 C 106 60, 98 38, 67 40 Z" fill="url(#splGrad)" opacity="0.95"/>
+        <!-- Note head -->
+        <ellipse cx="44" cy="84" rx="20" ry="14" transform="rotate(-18 44 84)" fill="url(#splGrad)"/>
+        <!-- Highlight -->
+        <ellipse cx="37" cy="80" rx="7" ry="4" transform="rotate(-18 37 80)" fill="#FFFFFF" opacity="0.45"/>
+        <!-- Sparkles -->
+        <circle cx="100" cy="28" r="2.2" fill="#FFB800"/>
+        <circle cx="108" cy="50" r="1.5" fill="#00FF94"/>
+        <circle cx="20" cy="40" r="1.8" fill="#00F0FF"/>
+      </svg>
+      <div class="splash-title">Entrenador de Lectura</div>
+      <div class="splash-tag">Benvingut</div>
+      <div class="splash-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+    </div>
+  </div>
+
   <!-- Cursor glow (seguirà el ratolí) -->
   <div class="cursor-glow" id="cursor-glow"></div>
 
@@ -438,6 +493,23 @@
     </div>
   </div>
 
+  <script>
+    // Amaga el splash quan la pàgina està carregada (mínim 900ms perquè l'entrada es vegi)
+    (function () {
+      const splash = document.getElementById("app-splash");
+      if (!splash) return;
+      const start = performance.now();
+      const hide = () => {
+        const wait = Math.max(0, 900 - (performance.now() - start));
+        setTimeout(() => {
+          splash.classList.add("hidden");
+          setTimeout(() => splash.remove(), 800);
+        }, wait);
+      };
+      if (document.readyState === "complete") hide();
+      else window.addEventListener("load", hide, { once: true });
+    })();
+  </script>
   <script>
     // Cursor glow només en no-touch
     (function () {

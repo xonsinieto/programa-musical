@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v15-popover";
+const CACHE = "lectura-notes-v16-fixes";
 const FILES = [
   "./",
   "./index.html",
