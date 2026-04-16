@@ -1893,14 +1893,14 @@ main {
     padding: 0 3px;
     margin: 4px auto;
   }
-  /* Controls: WRAP automàtic si no caben → res queda amagat darrere de scroll.
-     Triggers amb valor truncat ('Les dues…') per minimitzar amplada. */
+  /* Controls: flex-wrap a 2 files si cal, tot sempre visible, zero scroll.
+     Etiquetes ben visibles (CLAU / NIVELL / MODE) però tipografia molt petita. */
   .controls {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 4px 6px;
     padding: 5px 6px;
     margin: 0 3px 5px;
     background: rgba(18, 22, 45, 0.55);
@@ -1911,53 +1911,51 @@ main {
     box-shadow: 0 6px 20px rgba(0,0,0,0.35);
     color: var(--ink);
   }
-  /* Al mòbil amagem el text literal del <label> ('Clau:', 'Nivell:', 'Mode:')
-     — el valor triat del select ja indica de què és. font-size:0 amaga el text
-     directe; els fills restauren font size. */
   .controls label {
     display: inline-flex;
     align-items: center;
-    gap: 0;
+    gap: 4px;
     flex-shrink: 1;
     min-width: 0;
-    font-size: 0;
+    font-size: 0.52rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: rgba(232, 236, 241, 0.7);
+    font-weight: 600;
     white-space: nowrap;
-  }
-  .controls label > * {
-    font-size: 0.66rem;
   }
   .controls select,
   .controls input {
     flex-shrink: 1;
     min-width: 0;
-    max-width: none;
+    max-width: 110px;
     font-size: 0.66rem;
     padding: 4px 6px;
     border: 1px solid var(--glass-border);
     border-radius: 7px;
     background: rgba(5, 7, 15, 0.6);
     color: var(--ink);
-    min-height: 28px;
+    min-height: 26px;
   }
   .controls .xsel {
     flex-shrink: 1;
     min-width: 0;
-    max-width: 110px;
+    max-width: 100px;
   }
   .controls .xsel-trigger {
     width: 100%;
-    font-size: 0.66rem;
-    padding: 4px 7px;
-    min-height: 28px;
+    font-size: 0.64rem;
+    padding: 3px 6px;
+    min-height: 26px;
     border-radius: 7px;
     gap: 4px;
     background: rgba(5, 7, 15, 0.6);
     white-space: nowrap;
     overflow: hidden;
   }
-  /* Trunca el valor llarg amb ellipsis perquè càpiga */
+  /* Trunca el valor llarg amb ellipsis per garantir amplada compacta */
   .controls .xsel-value {
-    max-width: 80px;
+    max-width: 66px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1970,9 +1968,9 @@ main {
   }
   .controls button {
     flex-shrink: 0;
-    font-size: 0.58rem;
-    padding: 5px 10px;
-    min-height: 28px;
+    font-size: 0.56rem;
+    padding: 4px 10px;
+    min-height: 26px;
     font-weight: 700;
     letter-spacing: 0.04em;
     white-space: nowrap;
