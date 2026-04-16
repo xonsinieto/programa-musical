@@ -129,6 +129,38 @@
     });
   }
 
+  // Burst de partícules a la posició d'una nota (Guitar Hero style hit)
+  function burstNoteAt(noteEl, colors, count) {
+    if (!noteEl) return;
+    try {
+      const rect = noteEl.getBoundingClientRect();
+      if (rect.width === 0) return;
+      spawnConfetti({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+        count: count || 22,
+        colors: colors || ["#00F0FF", "#00FF94", "#FFB800"]
+      });
+    } catch (e) {}
+  }
+
+  // Flash de la línia d'impacte (brilla breument)
+  function flashHitLine() {
+    if (!spSvg) return;
+    const line = spSvg.querySelector("line");
+    if (!line) return;
+    const origWidth = line.getAttribute("stroke-width") || "3";
+    const origStroke = line.getAttribute("stroke");
+    line.setAttribute("stroke-width", "5");
+    line.setAttribute("stroke", "#00F0FF");
+    line.style.filter = "drop-shadow(0 0 24px rgba(0, 240, 255, 0.9)) drop-shadow(0 0 48px rgba(255, 16, 240, 0.5))";
+    setTimeout(() => {
+      line.setAttribute("stroke-width", origWidth);
+      line.setAttribute("stroke", origStroke || "#e74c3c");
+      line.style.filter = "";
+    }, 250);
+  }
+
   // ---------- TOAST NOTIFICATION ----------
   function showToast(msg, type) {
     const toast = document.createElement("div");
@@ -2121,6 +2153,20 @@
       n.x -= dx;
       n.el.setAttribute("transform", `translate(${n.x}, ${n.y})`);
 
+      // Pulse glow quan s'acosta a la línia d'impacte (~80px abans)
+      if (n.state === "pending") {
+        const dist = n.x - spHitLineX;
+        if (dist < 80 && dist > -15) {
+          if (!n.nearFlagged) {
+            n.el.classList.add("sp-note-near");
+            n.nearFlagged = true;
+          }
+        } else if (n.nearFlagged) {
+          n.el.classList.remove("sp-note-near");
+          n.nearFlagged = false;
+        }
+      }
+
       if (n.state === "pending" && n.x < spHitLineX - 20) {
         // Nota perduda → fail
         spOnFail(n);
@@ -2154,6 +2200,11 @@
       playNote(target.note);
       spColorNote(target.el, "#27ae60");
       burstStaff(spContainer);
+
+      // 🎸 Guitar Hero style: explosió de partícules + flash hit line
+      burstNoteAt(target.el, ["#00F0FF", "#00FF94", "#FFB800", "#FF10F0"], 26);
+      flashHitLine();
+
       const el = target.el;
       setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 160);
       const idx = spActive.indexOf(target);
@@ -2186,6 +2237,9 @@
 
     // Pinta la nota fallada de vermell i afegeix etiqueta SOBRE la nota
     spColorNote(failedNote.el, "#e74c3c");
+
+    // 💥 Burst de partícules vermelles (Guitar Hero style miss)
+    burstNoteAt(failedNote.el, ["#FF3366", "#9A1750", "#BC4749"], 18);
     const SVG_NS = "http://www.w3.org/2000/svg";
     const label = document.createElementNS(SVG_NS, "text");
     label.setAttribute("x", 0);

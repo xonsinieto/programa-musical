@@ -206,12 +206,31 @@ body::after {
   translate: calc(var(--parallax-x, 0) * 0.4) calc(var(--parallax-y, 0) * 0.4);
 }
 
+/* ====== Guitar Hero: pulse glow a la nota acostant-se a la línia d'impacte ====== */
+@keyframes spNotePulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 4px rgba(0, 240, 255, 0.7));
+  }
+  50% {
+    filter: drop-shadow(0 0 22px rgba(0, 240, 255, 1)) drop-shadow(0 0 40px rgba(255, 16, 240, 0.6));
+  }
+}
+
+.sp-note-near {
+  animation: spNotePulse 400ms ease-in-out infinite;
+}
+
+.sp-note-near .sp-note-shape ellipse {
+  transition: fill 150ms ease;
+}
+
 /* Disable rhythm animations on reduced-motion */
 @media (prefers-reduced-motion: reduce) {
   #staff-container,
   #fc-staff-container,
   #sp-game-container,
-  .big-start {
+  .big-start,
+  .sp-note-near {
     animation: none !important;
   }
   .toast {
