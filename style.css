@@ -1571,20 +1571,19 @@ main {
     letter-spacing: 0.12em;
   }
   nav.tabs {
-    gap: 4px;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding: 6px 2px 8px;
-    scrollbar-width: none;
+    gap: 5px;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 4px 8px 10px;
+    max-width: 100%;
   }
-  nav.tabs::-webkit-scrollbar { display: none; }
   nav.tabs .tab {
-    padding: 7px 11px;
+    padding: 7px 10px;
     font-size: 0.55rem;
     flex: 0 0 auto;
     white-space: nowrap;
-    letter-spacing: 0.1em;
-    min-height: 36px;
+    letter-spacing: 0.08em;
+    min-height: 34px;
   }
   .profile-bar {
     padding: 7px 10px;
