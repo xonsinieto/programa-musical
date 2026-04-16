@@ -3241,6 +3241,21 @@
     g.style.pointerEvents = "all";
     g.style.cursor = "pointer";
 
+    // Zona clic INVISIBLE més ampla que el cap de la nota (facilita encertar
+    // amb ratolí o dit sense haver de tocar el punt exacte). La classe hu-hit
+    // s'exclou del filtre drop-shadow del :hover perquè l'aurèola NO es veu
+    // en forma de rectangle.
+    const hit = document.createElementNS(SVG_NS, "rect");
+    hit.setAttribute("class", "hu-hit");
+    hit.setAttribute("x", -22);
+    hit.setAttribute("y", -34);
+    hit.setAttribute("width", 44);
+    hit.setAttribute("height", 68);
+    hit.setAttribute("fill", "transparent");
+    hit.setAttribute("stroke", "none");
+    hit.setAttribute("pointer-events", "all");
+    g.appendChild(hit);
+
     huNoteGroup.appendChild(g);
     const anim = g.animate([
       { transform: "translate3d(" + startX + "px, " + y + "px, 0)" },
