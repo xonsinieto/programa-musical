@@ -1652,11 +1652,11 @@
       rect.setAttribute("height", whiteHeight);
       const isMain = (k.letter === mainLetter && k.oct === mainOct);
       const isSec  = (secondaryNote && k.letter === secLetter && k.oct === secOct);
-      let fill = "#ffffff";
+      let fill = "#F6EFE0"; /* cream paper, coherent amb pentagrames */
       if (isMain) fill = COLOR_MAIN;
       else if (isSec) fill = COLOR_SEC;
       rect.setAttribute("fill", fill);
-      rect.setAttribute("stroke", "#333");
+      rect.setAttribute("stroke", "#6B4E2E");
       rect.setAttribute("stroke-width", "1");
       rect.style.cursor = "pointer";
       const noteKey = k.letter.toLowerCase() + "/" + k.oct;
