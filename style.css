@@ -1914,17 +1914,20 @@ main {
     scrollbar-width: none;
   }
   .controls::-webkit-scrollbar { display: none; }
+  /* Al mòbil amagem el text de l'etiqueta ('Clau:', 'Nivell:', 'Mode:') perquè
+     el valor triat del select ja indica de què és cada cosa i així tot cap en
+     una pantalla estreta sense scroll lateral. */
   .controls label {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
+    gap: 0;
     flex-shrink: 0;
     min-width: 0;
-    font-size: 0.5rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: rgba(232, 236, 241, 0.55);
+    font-size: 0; /* oculta text directe del label */
     white-space: nowrap;
+  }
+  .controls label > * {
+    font-size: 0.66rem; /* restaurat per fills (select, xsel, input, span) */
   }
   .controls select,
   .controls input {
@@ -1975,21 +1978,25 @@ main {
     margin: 6px 3px;
   }
   .note-btn {
-    padding: 9px 0;
-    font-size: 0.82rem;
-    border-radius: 10px;
-    min-height: 38px;
+    padding: 6px 0;
+    font-size: 0.78rem;
+    border-radius: 9px;
+    min-height: 34px;
   }
   .stats {
-    font-size: 0.52rem;
-    padding: 7px 8px;
-    gap: 4px;
+    font-size: 0.5rem;
+    padding: 5px 6px;
+    gap: 3px 6px;
     flex-wrap: wrap;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
   }
   .stats strong {
-    font-size: 0.85rem;
-    margin-left: 3px;
+    font-size: 0.78rem;
+    margin-left: 2px;
+  }
+  .answer-buttons {
+    gap: 3px;
+    margin: 4px 3px 5px;
   }
   /* Alçada suficient perquè el grand staff sencer (treble + clau de Fa) hi càpiga
      amb escala 0.62: VF renderitza ~460px d'alçada intrínseca × 0.62 ≈ 285px.
@@ -2548,32 +2555,7 @@ main {
    CAÇA — tria diana i caça-la entre notes aleatòries
    ================================================================== */
 
-/* Indicador "Diana: DO" dins dels controls */
-.hu-target-info {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  background: linear-gradient(135deg, rgba(0, 240, 255, 0.12), rgba(255, 16, 240, 0.08));
-  border: 1px solid rgba(0, 240, 255, 0.35);
-  border-radius: 12px;
-  color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  box-shadow: inset 0 0 14px rgba(0, 240, 255, 0.08);
-}
-.hu-target-info strong {
-  font-family: var(--font-display);
-  font-weight: 900;
-  font-size: 1.25rem;
-  background: linear-gradient(100deg, var(--primary), var(--accent));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  letter-spacing: 0;
-}
+/* (Pill '.hu-target-info' tret — redundant amb la barra 'Memoritza els DO') */
 
 /* Botó-diana seleccionat: igual que note-btn però amb anell cian permanent */
 .hu-target-btn.is-selected {
@@ -2689,17 +2671,18 @@ main {
 }
 @media (max-width: 600px) {
   .hu-info-bar {
-    padding: 8px 12px;
-    gap: 8px 14px;
-    margin: 8px 0 4px;
+    padding: 6px 10px;
+    gap: 6px 10px;
+    margin: 4px 0 3px;
+    border-radius: 10px;
   }
-  .hu-info-text { font-size: 0.8rem; gap: 4px 8px; }
-  .hu-info-label { font-size: 0.64rem; letter-spacing: 0.08em; }
-  .hu-info-bar strong { font-size: 1.25rem; }
-  .hu-info-bar-fail strong { font-size: 1.15rem; }
-  .hu-info-score { font-size: 0.78rem; padding: 2px 8px; }
-  .hu-info-best { font-size: 0.68rem; }
-  .hu-info-start { font-size: 0.82rem !important; padding: 8px 16px !important; }
+  .hu-info-text { font-size: 0.74rem; gap: 3px 7px; }
+  .hu-info-label { font-size: 0.58rem; letter-spacing: 0.06em; }
+  .hu-info-bar strong { font-size: 1.1rem; }
+  .hu-info-bar-fail strong { font-size: 1rem; }
+  .hu-info-score { font-size: 0.72rem; padding: 2px 7px; }
+  .hu-info-best { font-size: 0.62rem; }
+  .hu-info-start { font-size: 0.76rem !important; padding: 6px 12px !important; min-height: 28px !important; }
 }
 
 /* Notes del pentagrama Caça: will-change transform per compositor GPU. */
@@ -2732,27 +2715,17 @@ main {
   /* negre per defecte; l'usuari aprèn la POSICIÓ sense pistes de color */
 }
 
-/* Mòbil: target-info més petit, cap al centre del grid-2col */
 @media (max-width: 600px) {
-  .hu-target-info {
-    grid-column: 1 / -1;
-    justify-content: center;
-    justify-self: center;
-    padding: 6px 12px;
-    font-size: 0.7rem;
-  }
-  .hu-target-info strong {
-    font-size: 1.05rem;
-  }
-  /* Caça: mateix criteri que els altres — grand staff sencer visible */
+  /* Caça: una mica més baix perquè la memo-bar/retry-bar van OUT i afegeixen
+     alçada al total vertical. L'escala també baixa per preservar proporcions. */
   #hu-game-container {
-    min-height: 300px;
-    height: 300px;
+    min-height: 260px;
+    height: 260px;
     padding: 0;
     overflow: hidden;
   }
   #hu-game-container svg {
-    transform: scale(0.62);
+    transform: scale(0.55);
     transform-origin: top left;
     width: 100%;
     height: auto;
