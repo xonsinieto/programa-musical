@@ -814,15 +814,18 @@ nav.tabs .tab:active {
     linear-gradient(135deg, rgba(0, 240, 255, 0.035) 0%, rgba(255, 16, 240, 0.035) 100%),
     #F6EFE0;
   box-shadow:
-    0 20px 50px rgba(0, 0, 0, 0.5),
+    0 1px 0 rgba(255, 255, 255, 0.05),
+    0 2px 10px rgba(0, 0, 0, 0.35),
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    0 0 100px rgba(0, 240, 255, 0.06),
     inset 0 0 80px rgba(140, 100, 60, 0.1);
-  /* Fade lateral + vertical cap al fons cosmic */
+  /* Feathering lateral molt subtil */
   mask-image:
-    linear-gradient(90deg, transparent 0%, #000 4%, #000 96%, transparent 100%),
-    linear-gradient(180deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+    linear-gradient(90deg, transparent 0%, #000 1.5%, #000 98.5%, transparent 100%),
+    linear-gradient(180deg, transparent 0%, #000 3%, #000 97%, transparent 100%);
   -webkit-mask-image:
-    linear-gradient(90deg, transparent 0%, #000 4%, #000 96%, transparent 100%),
-    linear-gradient(180deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+    linear-gradient(90deg, transparent 0%, #000 1.5%, #000 98.5%, transparent 100%),
+    linear-gradient(180deg, transparent 0%, #000 3%, #000 97%, transparent 100%);
   mask-composite: intersect;
   -webkit-mask-composite: source-in;
   padding: 30px 0;
@@ -900,17 +903,19 @@ nav.tabs .tab:active {
     #F6EFE0;
   border-radius: var(--radius-lg);
   box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.5),
-    0 0 40px rgba(0, 240, 255, 0.15),
-    inset 0 0 60px rgba(140, 100, 60, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 8px rgba(0, 0, 0, 0.4),
+    0 30px 90px rgba(0, 0, 0, 0.55),
+    0 0 80px rgba(0, 240, 255, 0.08),
+    inset 0 0 70px rgba(140, 100, 60, 0.11);
   border: none;
   padding: 24px 0;
   min-height: 480px;
   margin-bottom: 12px;
-  /* vores difuminades cap al fons cosmic */
-  mask-image: radial-gradient(ellipse at center, #000 88%, rgba(0,0,0,0.35) 97%, transparent 100%);
-  -webkit-mask-image: radial-gradient(ellipse at center, #000 88%, rgba(0,0,0,0.35) 97%, transparent 100%);
+  /* Feathering ultra-subtil */
+  mask-image: radial-gradient(ellipse 101% 102% at center, #000 98.5%, rgba(0,0,0,0.65) 99.5%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 101% 102% at center, #000 98.5%, rgba(0,0,0,0.65) 99.5%, transparent 100%);
 }
 
 #fc-staff-container {
@@ -1398,10 +1403,14 @@ main {
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.3 0 0 0 0 0.24 0 0 0 0.12 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"),
     linear-gradient(135deg, rgba(0, 240, 255, 0.035) 0%, rgba(255, 16, 240, 0.035) 100%),
     #F6EFE0;
+  /* Multi-layer premium shadow: ressò neó + drop far + halo suau */
   box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.55),
-    0 0 50px rgba(0, 240, 255, 0.18),
-    inset 0 0 60px rgba(140, 100, 60, 0.12);
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 1px 0 rgba(255, 255, 255, 0.06),
+    0 2px 8px rgba(0, 0, 0, 0.4),
+    0 30px 90px rgba(0, 0, 0, 0.55),
+    0 0 80px rgba(0, 240, 255, 0.08),
+    inset 0 0 70px rgba(140, 100, 60, 0.11);
   padding: 30px 20px;
   display: block;
   min-height: 480px;
@@ -1412,9 +1421,9 @@ main {
   left: 50%;
   translate: -50% 0;
   border: none;
-  /* vores difuminades cap al fons cosmic */
-  mask-image: radial-gradient(ellipse at center, #000 88%, rgba(0,0,0,0.35) 97%, transparent 100%);
-  -webkit-mask-image: radial-gradient(ellipse at center, #000 88%, rgba(0,0,0,0.35) 97%, transparent 100%);
+  /* Feathering ultra-subtil (només 1% del edge fa transició) */
+  mask-image: radial-gradient(ellipse 101% 102% at center, #000 98.5%, rgba(0,0,0,0.65) 99.5%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 101% 102% at center, #000 98.5%, rgba(0,0,0,0.65) 99.5%, transparent 100%);
 }
 
 #staff-container::before {
