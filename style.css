@@ -431,8 +431,10 @@ header {
   text-align: center;
   position: relative;
   border-bottom: 1px solid var(--glass-border);
-  overflow: hidden;
 }
+
+/* només la marquee tallar overflow, no el header sencer */
+.hero-marquee { overflow: hidden; }
 
 .hero-tag {
   display: inline-flex;
@@ -470,9 +472,11 @@ header h1 {
   font-size: clamp(1.8rem, 5.5vw, 4rem);
   font-weight: 900;
   letter-spacing: -0.035em;
-  line-height: 0.95;
+  line-height: 1.1;
   max-width: 900px;
   text-wrap: balance;
+  overflow: visible;
+  padding: 0 0.2em;
 }
 
 .hero-word {
@@ -494,12 +498,15 @@ header h1 {
   font-family: var(--font-display);
   font-weight: 400;
   font-style: italic;
-  letter-spacing: -0.02em;
-  padding: 0 0.15em 0 0.05em;  /* evita que els descenders/itàlic quedin tallats */
+  letter-spacing: 0;
+  padding: 0.1em 0.25em;  /* evita que els itàlics quedin tallats */
+  margin: 0 0.05em;
+  overflow: visible;
   background: linear-gradient(135deg, var(--primary) 0%, var(--purple) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  font-variation-settings: "opsz" 40;
 }
 
 .hero-word--bright {
@@ -784,11 +791,14 @@ nav.tabs .tab:active {
 
 #ref-staff-container {
   background:
-    linear-gradient(135deg, rgba(0, 240, 255, 0.03) 0%, rgba(255, 16, 240, 0.03) 100%),
-    rgba(245, 245, 250, 0.97);
+    radial-gradient(ellipse at center, transparent 55%, rgba(90, 70, 40, 0.10) 100%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.3 0 0 0 0 0.24 0 0 0 0.12 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"),
+    linear-gradient(135deg, rgba(0, 240, 255, 0.035) 0%, rgba(255, 16, 240, 0.035) 100%),
+    #F6EFE0;
   box-shadow:
     0 20px 50px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    inset 0 0 60px rgba(140, 100, 60, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
   padding: 30px 0;
   overflow: hidden;
   margin-bottom: 20px;
@@ -854,13 +864,16 @@ nav.tabs .tab:active {
 #fc-staff-container,
 #sp-game-container {
   background:
-    linear-gradient(135deg, rgba(0, 240, 255, 0.03) 0%, rgba(255, 16, 240, 0.03) 100%),
-    rgba(245, 245, 250, 0.96);
+    radial-gradient(ellipse at center, transparent 55%, rgba(90, 70, 40, 0.10) 100%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.3 0 0 0 0 0.24 0 0 0 0.12 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"),
+    linear-gradient(135deg, rgba(0, 240, 255, 0.035) 0%, rgba(255, 16, 240, 0.035) 100%),
+    #F6EFE0;
   border-radius: var(--radius-lg);
   box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.5),
     0 0 40px rgba(0, 240, 255, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    inset 0 0 60px rgba(140, 100, 60, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
   border: 1px solid var(--glass-border-strong);
   padding: 24px 0;
   min-height: 480px;
@@ -1326,12 +1339,19 @@ main {
 
 #staff-container {
   background:
-    linear-gradient(135deg, rgba(0, 240, 255, 0.03) 0%, rgba(255, 16, 240, 0.03) 100%),
-    rgba(245, 245, 250, 0.96);
+    /* Vignette: corners lleugerament més foscos (paper edge feel) */
+    radial-gradient(ellipse at center, transparent 55%, rgba(90, 70, 40, 0.10) 100%),
+    /* Noise textura paper (data URI inline SVG) */
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.3 0 0 0 0 0.24 0 0 0 0.12 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"),
+    /* Tint cromàtic subtil (neon aurora) */
+    linear-gradient(135deg, rgba(0, 240, 255, 0.035) 0%, rgba(255, 16, 240, 0.035) 100%),
+    /* Base càlida cream paper */
+    #F6EFE0;
   box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.5),
     0 0 40px rgba(0, 240, 255, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    inset 0 0 60px rgba(140, 100, 60, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
   padding: 30px 20px;
   display: block;
   min-height: 480px;
@@ -1340,7 +1360,7 @@ main {
   width: min(90vw, 1200px);
   position: relative;
   left: 50%;
-  translate: -50% 0;      /* centrat independent de transform (no conflicte amb animació) */
+  translate: -50% 0;
   border: 1px solid var(--glass-border-strong);
 }
 
