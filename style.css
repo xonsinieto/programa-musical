@@ -432,9 +432,9 @@ html::after {
   inset: 0;
   pointer-events: none;
   z-index: 9998;
-  opacity: 0.5;
+  opacity: 0.35;
   filter: url(#noise-grain);
-  background: #fff;
+  background: transparent;
   mix-blend-mode: overlay;
 }
 
@@ -1261,6 +1261,20 @@ nav.tabs .tab:active {
   width: 560px;
   max-width: 100%;
   margin: 0 auto;
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(90, 70, 40, 0.10) 100%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.3 0 0 0 0 0.24 0 0 0 0.12 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"),
+    linear-gradient(135deg, rgba(0, 240, 255, 0.035) 0%, rgba(255, 16, 240, 0.035) 100%),
+    #F6EFE0;
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05),
+    0 2px 10px rgba(0, 0, 0, 0.4),
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    inset 0 0 60px rgba(140, 100, 60, 0.10);
+  mask-image: radial-gradient(ellipse 100% 100% at center, #000 99.6%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 100% 100% at center, #000 99.6%, transparent 100%);
 }
 
 #modal-staff svg {
@@ -1421,9 +1435,9 @@ main {
   left: 50%;
   translate: -50% 0;
   border: none;
-  /* Feathering ultra-subtil (només 1% del edge fa transició) */
-  mask-image: radial-gradient(ellipse 101% 102% at center, #000 98.5%, rgba(0,0,0,0.65) 99.5%, transparent 100%);
-  -webkit-mask-image: radial-gradient(ellipse 101% 102% at center, #000 98.5%, rgba(0,0,0,0.65) 99.5%, transparent 100%);
+  /* Feathering quasi imperceptible (2-3px al edge) */
+  mask-image: radial-gradient(ellipse 100% 100% at center, #000 99.6%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 100% 100% at center, #000 99.6%, transparent 100%);
 }
 
 #staff-container::before {
