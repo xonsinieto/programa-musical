@@ -2761,31 +2761,45 @@
     g.classList.add("sp-note");
     spDrawLedgers(g, SVG_NS, y, clef);
     spDrawQuarterNote(g, SVG_NS, y, clef);
-    // Usem CSS transform (no SVG attr) per GPU compositing amb will-change.
-    g.style.transform = "translate3d(" + spSpawnX + "px, " + y + "px, 0)";
+
+    // ----- Web Animations API -----
+    // L'animació la gestiona el compositor del navegador (GPU-thread), no JS.
+    // Això elimina els "parons" causats per style writes / style recalc per frame.
+    const startX = spSpawnX;
+    const endX   = spHitLineX - 40;
+    const distancePx = startX - endX;
+    const durationMs = distancePx / spPxPerMs();
+    g.style.transform = "translate3d(" + startX + "px, " + y + "px, 0)";
     spNoteGroup.appendChild(g);
-    spActive.push({ clef, note, x: spSpawnX, y, el: g, state: "pending" });
+    const anim = g.animate([
+      { transform: "translate3d(" + startX + "px, " + y + "px, 0)" },
+      { transform: "translate3d(" + endX   + "px, " + y + "px, 0)" }
+    ], { duration: durationMs, easing: "linear", fill: "forwards" });
+
+    spActive.push({
+      clef, note, y, el: g, state: "pending",
+      startTime: performance.now(),
+      durationMs, startX, endX, x: startX,
+      nearFlagged: false,
+      anim
+    });
   }
 
   function spGameLoop(ts) {
     if (!spRunning || spState !== "playing") return;
-    if (!spLastFrame) spLastFrame = ts;
-    // Clamp dt a 50ms: si el navegador ha pausat (tab inactiu, GC) no fem salts grans
-    // que es veurien com a "salts" bruscos en reprendre.
-    const dt = Math.min(50, ts - spLastFrame);
     spLastFrame = ts;
-
-    const dx = spPxPerMs() * dt;
 
     for (let i = spActive.length - 1; i >= 0; i--) {
       const n = spActive[i];
-      n.x -= dx;
-      // CSS transform (no SVG attr) perquè el navegador pugui compondre per GPU.
-      n.el.style.transform = "translate3d(" + n.x + "px, " + n.y + "px, 0)";
+      // Posició calculada per temps — NO llegim getBoundingClientRect ni tocquem style
+      const elapsed = ts - n.startTime;
+      const progress = elapsed / n.durationMs;
+      const x = n.startX + (n.endX - n.startX) * progress;
+      n.x = x;
 
       // Pulse glow quan s'acosta a la línia d'impacte (~80px abans)
       if (n.state === "pending") {
-        const dist = n.x - spHitLineX;
+        const dist = x - spHitLineX;
         if (dist < 80 && dist > -15) {
           if (!n.nearFlagged) {
             n.el.classList.add("sp-note-near");
@@ -2797,8 +2811,7 @@
         }
       }
 
-      if (n.state === "pending" && n.x < spHitLineX - 20) {
-        // Nota perduda → fail
+      if (n.state === "pending" && x < spHitLineX - 20) {
         spOnFail(n);
         return;
       }
@@ -2835,6 +2848,9 @@
       burstNoteAt(target.el, ["#00F0FF", "#00FF94", "#FFB800", "#FF10F0"], 26);
       flashHitLine();
 
+      // Para l'animació WAAPI i congela la posició (perquè no segueixi avançant)
+      if (target.anim) { try { target.anim.pause(); } catch(e) {} }
+
       const el = target.el;
       setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 160);
       const idx = spActive.indexOf(target);
@@ -2862,6 +2878,8 @@
     if (spState !== "playing") return;
     spState = "paused";
     if (spRAF) cancelAnimationFrame(spRAF);
+    // Congela TOTES les animacions en curs perquè la pantalla quedi quieta
+    spActive.forEach(n => { if (n.anim) { try { n.anim.pause(); } catch(e) {} } });
     playErrorSound();
     const name = NOTE_NAMES_CA[noteLetter(failedNote.note)].toUpperCase();
 
@@ -3222,23 +3240,21 @@
 
   function huGameLoop(ts) {
     if (huState !== "playing") return;
-    if (!huLastFrame) huLastFrame = ts;
-    const dt = Math.min(50, ts - huLastFrame);
     huLastFrame = ts;
-    const dx = huPxPerMs() * dt;
 
     for (let i = huActive.length - 1; i >= 0; i--) {
       const n = huActive[i];
-      n.x -= dx;
-      n.el.style.transform = "translate3d(" + n.x + "px, " + n.y + "px, 0)";
+      // Posició calculada per temps — NO tocquem style cada frame (compositor s'encarrega)
+      const elapsed = ts - n.startTime;
+      const progress = elapsed / n.durationMs;
+      const x = n.startX + (n.endX - n.startX) * progress;
+      n.x = x;
 
-      if (n.state === "pending" && n.x < huHitLineX - 20) {
+      if (n.state === "pending" && x < huHitLineX - 20) {
         if (noteLetter(n.note) === huTarget) {
-          // Diana que se'ns ha escapat → game over
           huFail(n, "Has deixat passar una " + NOTE_NAMES_CA[huTarget].toUpperCase());
           return;
         }
-        // No-diana: només la eliminem
         if (n.el.parentNode) n.el.parentNode.removeChild(n.el);
         huActive.splice(i, 1);
       }
@@ -3261,7 +3277,12 @@
     g.classList.add("hu-note");
     spDrawLedgers(g, SVG_NS, y, clef);
     spDrawQuarterNote(g, SVG_NS, y, clef);
-    g.style.transform = "translate3d(" + huSpawnX + "px, " + y + "px, 0)";
+
+    const startX = huSpawnX;
+    const endX = huHitLineX - 40;
+    const distancePx = startX - endX;
+    const durationMs = distancePx / huPxPerMs();
+    g.style.transform = "translate3d(" + startX + "px, " + y + "px, 0)";
     g.style.pointerEvents = "all";
     g.style.cursor = "pointer";
 
@@ -3274,7 +3295,17 @@
     hit.setAttribute("fill", "rgba(0,0,0,0.001)");
     g.appendChild(hit);
 
-    const obj = { clef, note, x: huSpawnX, y, el: g, state: "pending" };
+    huNoteGroup.appendChild(g);
+    const anim = g.animate([
+      { transform: "translate3d(" + startX + "px, " + y + "px, 0)" },
+      { transform: "translate3d(" + endX   + "px, " + y + "px, 0)" }
+    ], { duration: durationMs, easing: "linear", fill: "forwards" });
+
+    const obj = {
+      clef, note, y, el: g, state: "pending",
+      startTime: performance.now(), durationMs, startX, endX, x: startX,
+      anim
+    };
     const handler = (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -3282,8 +3313,6 @@
     };
     g.addEventListener("click", handler);
     g.addEventListener("touchend", handler);
-
-    huNoteGroup.appendChild(g);
     huActive.push(obj);
   }
 
@@ -3301,6 +3330,8 @@
       flashHitLine();
       tickCounter(huStreakEl);
       huUpdateStats();
+      // Congela l'animació perquè la nota caçada no segueixi avançant mentre es fa fade-out
+      if (n.anim) { try { n.anim.pause(); } catch(e) {} }
       const el = n.el;
       setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 160);
       const idx = huActive.indexOf(n);
@@ -3316,6 +3347,8 @@
     if (huState !== "playing") return;
     huState = "paused";
     if (huRAF) { cancelAnimationFrame(huRAF); huRAF = null; }
+    // Congela totes les animacions WAAPI en curs perquè la pantalla quedi quieta
+    huActive.forEach(x => { if (x.anim) { try { x.anim.pause(); } catch(e) {} } });
     playErrorSound();
     shakeElement(huContainer);
     spColorNote(n.el, "#e74c3c");
@@ -3434,7 +3467,13 @@
     if (!NOTE_NAMES_CA[letter]) return; // protecció per si arriba un valor estrany
     huTarget = letter;
     const caName = NOTE_NAMES_CA[letter]; // "do", "re", ...
-    huTargetLabelEl.textContent = caName.toUpperCase();
+    const caUpper = caName.toUpperCase();
+    huTargetLabelEl.textContent = caUpper;
+    // Actualitza l'overlay "Memoritza els DO/RE/..."
+    const ovTargetEl = document.getElementById("hu-ov-target");
+    const ovTargetCaEl = document.getElementById("hu-ov-target-ca");
+    if (ovTargetEl) ovTargetEl.textContent = caUpper;
+    if (ovTargetCaEl) ovTargetCaEl.textContent = caUpper;
     huTargetButtons.forEach(b => b.classList.toggle("is-selected", b.dataset.note === caName));
     // Canvi de diana → reinicia partida (nou memoritzar)
     huCurrentSpeed = parseInt(huSpeedSelect.value, 10) || huCurrentSpeed;
@@ -3446,8 +3485,9 @@
   }
 
   function huEnterScreen() {
+    // En entrar, comencem SEMPRE amb diana DO i a velocitat 1 per començar net
     huCurrentSpeed = parseInt(huSpeedSelect.value, 10) || 1;
-    huSetTarget(huTarget);
+    huSetTarget("c"); // Do per defecte
   }
 
   huStartBtn.addEventListener("click", huStart);

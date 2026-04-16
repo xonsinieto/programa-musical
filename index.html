@@ -440,8 +440,8 @@
       <div id="hu-game-container">
         <div id="hu-overlay">
           <div id="hu-ov-start" class="sp-ov-panel">
-            <h2>Caça la nota</h2>
-            <p>Tria una diana a baix (<strong>Do/Re/…</strong>) i memoritza on cauen totes a dalt.<br>Prem Començar: vindran notes aleatòries. Cliquen la diana. Si erres, s'acaba.</p>
+            <h2>Memoritza els <strong id="hu-ov-target">DO</strong></h2>
+            <p>Mira on cauen totes les <strong id="hu-ov-target-ca">Do</strong> al pentagrama, a totes les octaves i les dues claus. Quan les tinguis a cap, prem <strong>Començar</strong> i caça-les abans que creuin la línia!</p>
             <button id="hu-start-btn" class="big-start">Començar</button>
           </div>
           <div id="hu-ov-fail" class="sp-ov-panel hidden">
@@ -494,13 +494,15 @@
   </div>
 
   <script>
-    // Amaga el splash quan la pàgina està carregada (mínim 900ms perquè l'entrada es vegi)
+    // Amaga el splash quan la pàgina està carregada (mínim 1600ms perquè es vegi bé,
+    // també quan la càrrega és super-ràpida a través del service worker caché).
     (function () {
       const splash = document.getElementById("app-splash");
       if (!splash) return;
       const start = performance.now();
+      const MIN_SHOW_MS = 1600;
       const hide = () => {
-        const wait = Math.max(0, 900 - (performance.now() - start));
+        const wait = Math.max(0, MIN_SHOW_MS - (performance.now() - start));
         setTimeout(() => {
           splash.classList.add("hidden");
           setTimeout(() => splash.remove(), 800);
