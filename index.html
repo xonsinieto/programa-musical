@@ -508,18 +508,18 @@
   </div>
 
   <script>
-    // Amaga el splash quan la pàgina està carregada (mínim 1600ms perquè es vegi bé,
-    // també quan la càrrega és super-ràpida a través del service worker caché).
+    // Amaga el splash quan la pàgina està carregada (mínim ~2.8s perquè el
+    // "Benvingut" s'arribi a llegir amb temps).
     (function () {
       const splash = document.getElementById("app-splash");
       if (!splash) return;
       const start = performance.now();
-      const MIN_SHOW_MS = 1600;
+      const MIN_SHOW_MS = 2800;
       const hide = () => {
         const wait = Math.max(0, MIN_SHOW_MS - (performance.now() - start));
         setTimeout(() => {
           splash.classList.add("hidden");
-          setTimeout(() => splash.remove(), 800);
+          setTimeout(() => splash.remove(), 900);
         }, wait);
       };
       if (document.readyState === "complete") hide();
