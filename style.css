@@ -2493,6 +2493,60 @@ main {
 }
 
 /* ==================================================================
+   PWA INSTALL FAB — botó flotant per instal·lar si el navegador ho permet
+   ================================================================== */
+.install-fab {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 9998;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #00F0FF 0%, #A855F7 55%, #FF10F0 100%);
+  color: #05070F;
+  font-family: var(--font-display, 'Unbounded', sans-serif);
+  font-weight: 700;
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow:
+    0 12px 30px rgba(0, 240, 255, 0.35),
+    0 4px 14px rgba(255, 16, 240, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  animation: installFabBreath 2.8s ease-in-out infinite;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.install-fab.hidden { display: none !important; }
+.install-fab:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow:
+    0 18px 40px rgba(0, 240, 255, 0.5),
+    0 6px 20px rgba(255, 16, 240, 0.45);
+}
+.install-fab:active { transform: translateY(0) scale(0.98); }
+.install-fab-icon {
+  font-size: 1.05rem;
+  transform: translateY(-1px);
+}
+@keyframes installFabBreath {
+  0%, 100% { box-shadow: 0 12px 30px rgba(0, 240, 255, 0.35), 0 4px 14px rgba(255, 16, 240, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+  50%      { box-shadow: 0 14px 36px rgba(0, 240, 255, 0.5),  0 6px 18px rgba(255, 16, 240, 0.5),  inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+}
+@media (max-width: 600px) {
+  .install-fab {
+    right: 10px;
+    bottom: 10px;
+    padding: 9px 14px;
+    font-size: 0.78rem;
+  }
+  .install-fab-text { font-size: 0.78rem; }
+}
+
+/* ==================================================================
    CAÇA — tria diana i caça-la entre notes aleatòries
    ================================================================== */
 

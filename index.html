@@ -80,6 +80,12 @@
   <!-- Cursor glow (seguirà el ratolí) -->
   <div class="cursor-glow" id="cursor-glow"></div>
 
+  <!-- Botó flotant d'instal·lació PWA (només surt si el navegador ho permet) -->
+  <button id="install-fab" class="install-fab hidden" type="button" aria-label="Instal·lar app">
+    <span class="install-fab-icon">⬇</span>
+    <span class="install-fab-text">Instal·lar app</span>
+  </button>
+
   <!-- SVG noise filter (aplicat globalment via CSS) -->
   <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
     <defs>
@@ -527,6 +533,45 @@
       }
       document.addEventListener("pointermove", function (e) { tx = e.clientX; ty = e.clientY; }, { passive: true });
       requestAnimationFrame(raf);
+    })();
+  </script>
+  <!-- PWA install FAB — listeners per beforeinstallprompt + appinstalled -->
+  <script>
+    (function () {
+      const fab = document.getElementById("install-fab");
+      if (!fab) return;
+      let deferred = null;
+
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferred = e;
+        fab.classList.remove("hidden");
+      });
+
+      window.addEventListener("appinstalled", () => {
+        fab.classList.add("hidden");
+        deferred = null;
+      });
+
+      fab.addEventListener("click", async () => {
+        if (!deferred) {
+          // Fallback: dona una pista si el navegador no ofereix install (iOS, ja instal·lada, etc.)
+          alert("Per instal·lar l'app:\n\n• Android Chrome: menú ⋮ → 'Afegir a pantalla d'inici' o 'Instal·lar app'.\n• iPhone Safari: botó Compartir → 'Afegir a pantalla d'inici'.\n\nSi no surt, potser ja la tens instal·lada (busca 'Lectura Notes' a les apps) o has d'esborrar les dades del lloc al navegador.");
+          return;
+        }
+        deferred.prompt();
+        try {
+          await deferred.userChoice;
+        } catch (e) {}
+        deferred = null;
+        fab.classList.add("hidden");
+      });
+
+      // Si ja està en mode standalone (PWA instal·lada oberta), oculta el FAB
+      if (window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true) {
+        fab.classList.add("hidden");
+        fab.style.display = "none";
+      }
     })();
   </script>
   <script src="app.js"></script>

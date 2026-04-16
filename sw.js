@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v17-waapi";
+const CACHE = "lectura-notes-v18-install";
 const FILES = [
   "./",
   "./index.html",
