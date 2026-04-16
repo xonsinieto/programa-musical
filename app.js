@@ -2982,7 +2982,7 @@
   const huClefSelect    = document.getElementById("hu-clef-select");
   const huLevelSelect   = document.getElementById("hu-level-select");
   const huSpeedSelect   = document.getElementById("hu-speed-select");
-  const huTargetLabelEl = document.getElementById("hu-target-label");
+  const huTargetLabelEl = document.getElementById("hu-target-label"); // pot ser null (la pill s'ha tret al mòbil)
   const huStartBtn      = document.getElementById("hu-start-btn");
   const huRetryBtn      = document.getElementById("hu-retry-btn");
   const huRestartBtn    = document.getElementById("hu-restart-btn");
@@ -3412,7 +3412,7 @@
     huTarget = letter;
     const caName = NOTE_NAMES_CA[letter]; // "do", "re", ...
     const caUpper = caName.toUpperCase();
-    huTargetLabelEl.textContent = caUpper;
+    if (huTargetLabelEl) huTargetLabelEl.textContent = caUpper;
     // Actualitza el text de la barra de memorització ("Memoritza els DO/RE/...")
     const memoTargetEl = document.getElementById("hu-memo-target");
     if (memoTargetEl) memoTargetEl.textContent = caUpper;

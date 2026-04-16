@@ -1893,22 +1893,21 @@ main {
     padding: 0 3px;
     margin: 4px auto;
   }
-  /* Controls en UNA SOLA FILA amb scroll horitzontal si no caben (com a web),
-     igual per totes les pantalles */
+  /* Controls en UNA SOLA FILA (com a web) amb scroll horitzontal si cal.
+     Molt compactats per cabre a pantalles estretes (~360-380px). */
   .controls {
     display: flex;
     flex-wrap: nowrap;
     align-items: center;
-    gap: 6px;
-    padding: 6px 8px;
-    margin: 0 3px 6px;
+    gap: 4px;
+    padding: 5px 6px;
+    margin: 0 3px 5px;
     background: rgba(18, 22, 45, 0.55);
     backdrop-filter: blur(14px) saturate(1.2);
     -webkit-backdrop-filter: blur(14px) saturate(1.2);
     border: 1px solid var(--glass-border);
-    border-radius: 12px;
+    border-radius: 11px;
     box-shadow: 0 6px 20px rgba(0,0,0,0.35);
-    font-size: 0.66rem;
     color: var(--ink);
     overflow-x: auto;
     overflow-y: visible;
@@ -1918,12 +1917,12 @@ main {
   .controls label {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
     flex-shrink: 0;
     min-width: 0;
-    font-size: 0.56rem;
+    font-size: 0.5rem;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     color: rgba(232, 236, 241, 0.55);
     white-space: nowrap;
   }
@@ -1932,13 +1931,13 @@ main {
     flex-shrink: 0;
     min-width: 0;
     max-width: none;
-    font-size: 0.74rem;
-    padding: 5px 8px;
+    font-size: 0.66rem;
+    padding: 4px 6px;
     border: 1px solid var(--glass-border);
-    border-radius: 8px;
+    border-radius: 7px;
     background: rgba(5, 7, 15, 0.6);
     color: var(--ink);
-    min-height: 30px;
+    min-height: 28px;
   }
   .controls .xsel {
     flex-shrink: 0;
@@ -1947,27 +1946,28 @@ main {
   }
   .controls .xsel-trigger {
     width: auto;
-    font-size: 0.72rem;
-    padding: 5px 10px;
-    min-height: 30px;
-    border-radius: 8px;
-    gap: 5px;
+    font-size: 0.66rem;
+    padding: 4px 7px;
+    min-height: 28px;
+    border-radius: 7px;
+    gap: 4px;
     background: rgba(5, 7, 15, 0.6);
     white-space: nowrap;
   }
   .controls .xsel-chevron {
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
     border-width: 1.5px;
   }
   .controls button {
     flex-shrink: 0;
-    font-size: 0.64rem;
-    padding: 6px 14px;
-    min-height: 30px;
+    font-size: 0.58rem;
+    padding: 5px 10px;
+    min-height: 28px;
     font-weight: 700;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
     white-space: nowrap;
+    border-radius: 7px;
   }
   .answer-buttons {
     grid-template-columns: repeat(7, 1fr);
