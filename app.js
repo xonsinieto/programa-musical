@@ -1309,6 +1309,10 @@
     const noteSpace = Math.max(14, (staveWidth - clefSpace - rightPad) / notes.length);
 
     const stave = new VF.Stave(xOffset, yOffset, staveWidth);
+    // Sense barres (ni inicial ni final): no tenen sentit a una carta de referència
+    // i produïen marques visuals a l'extrem dret que no corresponen a cap nota.
+    stave.setBegBarType(VF.Barline.type.NONE);
+    stave.setEndBarType(VF.Barline.type.NONE);
     stave.addClef(clef).setContext(context).draw();
 
     // Notes SENSE annotation (perquè el Formatter no les separi per longitud del text)
@@ -2750,9 +2754,11 @@
     const y    = spNoteY(note, clef);
     const SVG_NS = "http://www.w3.org/2000/svg";
     const g = document.createElementNS(SVG_NS, "g");
+    g.classList.add("sp-note");
     spDrawLedgers(g, SVG_NS, y, clef);
     spDrawQuarterNote(g, SVG_NS, y, clef);
-    g.setAttribute("transform", `translate(${spSpawnX}, ${y})`);
+    // Usem CSS transform (no SVG attr) per GPU compositing amb will-change.
+    g.style.transform = "translate3d(" + spSpawnX + "px, " + y + "px, 0)";
     spNoteGroup.appendChild(g);
     spActive.push({ clef, note, x: spSpawnX, y, el: g, state: "pending" });
   }
@@ -2760,7 +2766,9 @@
   function spGameLoop(ts) {
     if (!spRunning || spState !== "playing") return;
     if (!spLastFrame) spLastFrame = ts;
-    const dt = ts - spLastFrame;
+    // Clamp dt a 50ms: si el navegador ha pausat (tab inactiu, GC) no fem salts grans
+    // que es veurien com a "salts" bruscos en reprendre.
+    const dt = Math.min(50, ts - spLastFrame);
     spLastFrame = ts;
 
     const dx = spPxPerMs() * dt;
@@ -2768,7 +2776,8 @@
     for (let i = spActive.length - 1; i >= 0; i--) {
       const n = spActive[i];
       n.x -= dx;
-      n.el.setAttribute("transform", `translate(${n.x}, ${n.y})`);
+      // CSS transform (no SVG attr) perquè el navegador pugui compondre per GPU.
+      n.el.style.transform = "translate3d(" + n.x + "px, " + n.y + "px, 0)";
 
       // Pulse glow quan s'acosta a la línia d'impacte (~80px abans)
       if (n.state === "pending") {

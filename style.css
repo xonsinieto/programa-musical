@@ -207,17 +207,20 @@ body::after {
 }
 
 /* ====== Guitar Hero: pulse glow a la nota acostant-se a la línia d'impacte ====== */
-@keyframes spNotePulse {
-  0%, 100% {
-    filter: drop-shadow(0 0 4px rgba(0, 240, 255, 0.7));
-  }
-  50% {
-    filter: drop-shadow(0 0 22px rgba(0, 240, 255, 1)) drop-shadow(0 0 40px rgba(255, 16, 240, 0.6));
-  }
+/* Notes en moviment: GPU-composited perquè el moviment sigui fluid sense tall. */
+.sp-note {
+  will-change: transform;
+  transform: translateZ(0);
 }
 
-.sp-note-near {
-  animation: spNotePulse 400ms ease-in-out infinite;
+@keyframes spNotePulseCheap {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.18); }
+}
+
+.sp-note-near .sp-note-shape {
+  animation: spNotePulseCheap 380ms ease-in-out infinite;
+  transform-origin: center;
 }
 
 .sp-note-near .sp-note-shape ellipse {

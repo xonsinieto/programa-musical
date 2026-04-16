@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v10-relampec";
+const CACHE = "lectura-notes-v11";
 const FILES = [
   "./",
   "./index.html",
