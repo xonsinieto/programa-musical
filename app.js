@@ -3123,22 +3123,56 @@
           pop.appendChild(div);
         });
       }
+      function positionPop() {
+        // Posicionem el popover fix (en comptes de absolute) perquè no quedi
+        // tallat per cap parent amb overflow:hidden (pentagrama, controls, etc.)
+        const tr = trigger.getBoundingClientRect();
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const margin = 6;
+        const gap = 6;
+        // Amplada: mínim com el trigger, màxim 92vw o 360px
+        const triggerW = tr.width;
+        pop.style.minWidth = triggerW + "px";
+        // Obrir per mesurar alçada real
+        pop.hidden = false;
+        pop.style.left = "-9999px";
+        pop.style.top = "-9999px";
+        pop.style.maxHeight = Math.min(Math.floor(vh * 0.6), 420) + "px";
+        const popRect = pop.getBoundingClientRect();
+        const popH = popRect.height;
+        const popW = Math.max(triggerW, popRect.width);
+        // Decidir amunt o avall
+        const spaceBelow = vh - tr.bottom - margin;
+        const spaceAbove = tr.top - margin;
+        const dropUp = spaceBelow < popH && spaceAbove > spaceBelow;
+        let top = dropUp ? (tr.top - popH - gap) : (tr.bottom + gap);
+        // Clamp vertical
+        top = Math.max(margin, Math.min(top, vh - popH - margin));
+        // Alinear a l'esquerra del trigger, ajustant si s'escapa
+        let left = tr.left;
+        if (left + popW > vw - margin) left = vw - popW - margin;
+        if (left < margin) left = margin;
+        pop.style.top = top + "px";
+        pop.style.left = left + "px";
+        wrap.classList.toggle("xsel-drop-up", dropUp);
+      }
+
       function openPop() {
         closeAll();
-        pop.hidden = false;
         trigger.setAttribute("aria-expanded", "true");
         wrap.classList.add("xsel-open");
-        // Ajustar direcció (amunt si no cabra avall)
-        requestAnimationFrame(() => {
-          const r = pop.getBoundingClientRect();
-          const overflow = r.bottom > (window.innerHeight - 8);
-          wrap.classList.toggle("xsel-drop-up", overflow);
-        });
+        positionPop();
+        // Reposicionar en resize/scroll mentre és obert
+        window.addEventListener("resize", positionPop, { passive: true });
+        window.addEventListener("scroll", positionPop, { passive: true, capture: true });
       }
       function closePop() {
         pop.hidden = true;
         trigger.setAttribute("aria-expanded", "false");
         wrap.classList.remove("xsel-open", "xsel-drop-up");
+        window.removeEventListener("resize", positionPop, { passive: true });
+        window.removeEventListener("scroll", positionPop, { passive: true, capture: true });
       }
 
       trigger.addEventListener("click", (e) => {

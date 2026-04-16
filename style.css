@@ -443,33 +443,27 @@ select option:hover {
 }
 
 /* --- Popover cream paper --- */
+/* IMPORTANT: position:fixed perquè no el talli cap parent amb overflow:hidden
+   (pentagrames, .controls, etc.). top/left els calcula el JS (positionPop). */
 .xsel-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  min-width: 100%;
+  position: fixed;
   max-width: min(92vw, 360px);
-  max-height: min(60vh, 420px);
   overflow-y: auto;
-  z-index: 9999;
+  z-index: 10000;
   padding: 6px;
   background:
     radial-gradient(ellipse at center, transparent 60%, rgba(90, 70, 40, 0.07) 100%),
     linear-gradient(135deg, rgba(0, 240, 255, 0.03), rgba(255, 16, 240, 0.03)),
     #F6EFE0;
   color: #12162D;
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid rgba(0, 240, 255, 0.35);
   box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.35),
     0 30px 90px rgba(0, 0, 0, 0.55),
     0 0 70px rgba(0, 240, 255, 0.12),
     inset 0 0 40px rgba(140, 100, 60, 0.08);
-  animation: xselPopIn 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.xsel-drop-up .xsel-popover {
-  top: auto;
-  bottom: calc(100% + 6px);
+  animation: xselPopIn 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 @keyframes xselPopIn {
   from { opacity: 0; transform: translateY(-6px) scale(0.96); }
@@ -1781,56 +1775,57 @@ main {
 
 @media (max-width: 600px) {
   header {
-    padding: 10px 10px 0;
+    padding: 8px 8px 0;
   }
   .hero-tag {
-    font-size: 0.54rem;
-    padding: 4px 9px;
-    letter-spacing: 0.18em;
-    margin-bottom: 6px;
+    font-size: 0.5rem;
+    padding: 3px 7px;
+    letter-spacing: 0.16em;
+    margin-bottom: 4px;
   }
   .hero-tag-dot {
-    width: 6px; height: 6px;
+    width: 5px; height: 5px;
   }
   header h1 {
-    font-size: clamp(1.3rem, 7vw, 2rem);
-    margin: 0 0 6px 0;
+    font-size: clamp(1.1rem, 6vw, 1.7rem);
+    margin: 0 0 4px 0;
     letter-spacing: -0.04em;
   }
-  .hero-word { margin: 0 2px; }
+  .hero-word { margin: 0 1px; }
   header h1 .author {
-    font-size: 0.5rem;
-    margin-top: 6px;
-    letter-spacing: 0.22em;
+    font-size: 0.46rem;
+    margin-top: 4px;
+    letter-spacing: 0.2em;
   }
+  /* Marquee més discreta al mòbil (o directament ocultada si molesta) */
   .hero-marquee {
-    padding: 5px 0;
-    margin-top: 8px;
+    padding: 3px 0;
+    margin-top: 5px;
   }
   .hero-marquee-track {
-    font-size: 0.54rem;
-    gap: 22px;
-    letter-spacing: 0.12em;
+    font-size: 0.48rem;
+    gap: 18px;
+    letter-spacing: 0.1em;
   }
   nav.tabs {
-    gap: 5px;
+    gap: 4px;
     flex-wrap: wrap;
     justify-content: center;
-    padding: 4px 8px 10px;
+    padding: 3px 6px 8px;
     max-width: 100%;
   }
   nav.tabs .tab {
-    padding: 7px 10px;
-    font-size: 0.55rem;
+    padding: 6px 8px;
+    font-size: 0.52rem;
     flex: 0 0 auto;
     white-space: nowrap;
-    letter-spacing: 0.08em;
-    min-height: 34px;
+    letter-spacing: 0.06em;
+    min-height: 30px;
   }
   .profile-bar {
-    padding: 7px 10px;
-    gap: 6px;
-    font-size: 0.75rem;
+    padding: 5px 8px;
+    gap: 5px;
+    font-size: 0.72rem;
   }
   .profile-label {
     font-size: 0.6rem;
@@ -1841,31 +1836,42 @@ main {
     font-size: 0.8rem;
     min-width: 100px;
   }
+  .profile-bar .xsel-trigger {
+    padding: 5px 10px;
+    font-size: 0.72rem;
+    min-height: 32px;
+    min-width: 100px;
+  }
+  .profile-bar .xsel-chevron {
+    width: 7px;
+    height: 7px;
+    border-width: 1.5px;
+  }
   .profile-bar #profile-new-btn,
   .profile-bar #profile-export-btn,
   .profile-bar #profile-import-btn {
-    width: 30px;
-    height: 30px;
-    font-size: 0.85rem;
+    width: 28px;
+    height: 28px;
+    font-size: 0.78rem;
   }
-  .profile-bar #profile-new-btn { font-size: 1.1rem; }
+  .profile-bar #profile-new-btn { font-size: 1rem; }
   main {
-    padding: 0 4px;
-    margin: 6px auto;
+    padding: 0 3px;
+    margin: 5px auto;
   }
   .controls {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6px 10px;
-    padding: 10px 12px;
-    margin: 0 4px 8px;
+    gap: 5px 8px;
+    padding: 8px 10px;
+    margin: 0 3px 6px;
     background: rgba(18, 22, 45, 0.55);
     backdrop-filter: blur(14px) saturate(1.2);
     -webkit-backdrop-filter: blur(14px) saturate(1.2);
     border: 1px solid var(--glass-border);
-    border-radius: 14px;
+    border-radius: 12px;
     box-shadow: 0 6px 20px rgba(0,0,0,0.35);
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     align-items: center;
     color: var(--ink);
   }
@@ -1890,6 +1896,27 @@ main {
     color: var(--ink);
     min-height: 32px;
   }
+  /* El trigger del custom dropdown dins de .controls ha d'ocupar la mateixa
+     mida que el select antic per no trencar el grid 2-cols */
+  .controls .xsel {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 130px;
+  }
+  .controls .xsel-trigger {
+    width: 100%;
+    font-size: 0.76rem;
+    padding: 5px 10px;
+    min-height: 32px;
+    border-radius: 8px;
+    gap: 6px;
+    background: rgba(5, 7, 15, 0.6);
+  }
+  .controls .xsel-chevron {
+    width: 7px;
+    height: 7px;
+    border-width: 1.5px;
+  }
   .controls button {
     grid-column: 1 / -1;
     justify-self: center;
@@ -1900,34 +1927,40 @@ main {
     font-weight: 700;
     letter-spacing: 0.08em;
   }
+  /* Excepció: Relàmpec té el seu propi .rl-controls (flex no grid) */
+  #screen-sightread .controls button {
+    grid-column: auto;
+  }
   .answer-buttons {
     grid-template-columns: repeat(7, 1fr);
     gap: 3px;
+    margin: 6px 3px;
   }
   .note-btn {
-    padding: 12px 0;
-    font-size: 0.95rem;
-    border-radius: 12px;
-    min-height: 44px;
+    padding: 10px 0;
+    font-size: 0.88rem;
+    border-radius: 10px;
+    min-height: 40px;
   }
   .stats {
-    font-size: 0.6rem;
-    padding: 12px 10px;
-    gap: 6px;
+    font-size: 0.56rem;
+    padding: 8px 8px;
+    gap: 5px;
     flex-wrap: wrap;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.1em;
   }
   .stats strong {
-    font-size: 1rem;
-    margin-left: 4px;
+    font-size: 0.9rem;
+    margin-left: 3px;
   }
   #staff-container,
   #fc-staff-container,
-  #sp-game-container {
-    min-height: 280px;
-    height: 280px;
+  #sp-game-container,
+  #rl-staff-container {
+    min-height: 220px;
+    height: 220px;
     padding: 0;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     overflow: hidden;
   }
   #staff-container {
@@ -1935,7 +1968,8 @@ main {
   }
   #staff-container svg,
   #fc-staff-container svg,
-  #sp-game-container svg {
+  #sp-game-container svg,
+  #rl-staff-container svg {
     transform: scale(0.58);
     transform-origin: top left;
   }
@@ -2366,11 +2400,41 @@ main {
 @media (max-width: 640px) {
   #screen-sightread .rl-header {
     flex-direction: column;
-    padding: 14px 16px;
+    gap: 8px;
+    padding: 10px 12px;
+    margin: 2px 0 10px;
   }
-  #screen-sightread .rl-streak-pill { align-self: flex-start; }
-  .rl-tile { width: 26px; height: 26px; font-size: 0.72rem; }
-  .rl-result-row .rl-tile { width: 22px; height: 22px; font-size: 0.66rem; }
-  .rl-result-content { padding: 22px 18px 20px; }
+  #screen-sightread .rl-streak-pill {
+    align-self: flex-start;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+  }
+  #screen-sightread .rl-streak-num { font-size: 1.05rem; }
+  #screen-sightread .rl-title { font-size: clamp(1.1rem, 5vw, 1.4rem); }
+  #screen-sightread .rl-tagline { font-size: 0.78rem; }
+  #screen-sightread .rl-eyebrow { font-size: 0.72rem; gap: 8px; }
+  #screen-sightread .rl-controls {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  #screen-sightread .rl-countdown {
+    padding: 7px 12px;
+    margin-bottom: 8px;
+  }
+  #screen-sightread .rl-countdown-label { font-size: 0.72rem; }
+  #screen-sightread .rl-countdown-time { font-size: 1.05rem; }
+  #rl-current-note { font-size: 0.85rem; margin: 8px 0 4px; min-height: 18px; }
+  .rl-attempts { gap: 4px; margin: 8px 0 10px; }
+  .rl-attempt-row { gap: 3px; padding: 2px 3px; }
+  .rl-tile { width: 24px; height: 24px; font-size: 0.68rem; border-width: 1.5px; }
+  .rl-result-row .rl-tile { width: 20px; height: 20px; font-size: 0.62rem; }
+  .rl-result-content { padding: 18px 14px 16px; }
+  .rl-result-badge { width: 56px; height: 56px; font-size: 1.25rem; }
+  .rl-result-title { font-size: 1.3rem; }
+  .rl-stats {
+    font-size: 0.56rem;
+    padding: 8px;
+    gap: 4px 14px;
+  }
 }
 
