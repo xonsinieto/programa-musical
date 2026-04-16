@@ -1296,6 +1296,10 @@
     if (document.getElementById("screen-speed").classList.contains("active") && spRunning) {
       spBuildStage();
     }
+    const huScreen = document.getElementById("screen-hunt");
+    if (huScreen && huScreen.classList.contains("active") && typeof huShowMemorize === "function" && huState !== "idle") {
+      huShowMemorize();
+    }
   });
 
   // ---------- REFERÈNCIA ----------
@@ -3036,6 +3040,418 @@
     btn.addEventListener("click", () => spHandleAnswer(btn.dataset.note, btn));
   });
 
+  // ---------- CAÇA (triar nota-diana + memoritzar posicions + caçar-la entre aleatòries) ----------
+  const huClefSelect    = document.getElementById("hu-clef-select");
+  const huLevelSelect   = document.getElementById("hu-level-select");
+  const huSpeedSelect   = document.getElementById("hu-speed-select");
+  const huTargetLabelEl = document.getElementById("hu-target-label");
+  const huStartBtn      = document.getElementById("hu-start-btn");
+  const huRetryBtn      = document.getElementById("hu-retry-btn");
+  const huRestartBtn    = document.getElementById("hu-restart-btn");
+  const huContainer     = document.getElementById("hu-game-container");
+  const huOverlay       = document.getElementById("hu-overlay");
+  const huOvStart       = document.getElementById("hu-ov-start");
+  const huOvFail        = document.getElementById("hu-ov-fail");
+  const huOvLevelUp     = document.getElementById("hu-ov-levelup");
+  const huOvWin         = document.getElementById("hu-ov-win");
+  const huOvFailSub     = document.getElementById("hu-ov-fail-sub");
+  const huLvlUpTitle    = document.getElementById("hu-lvlup-title");
+  const huLvlUpSub      = document.getElementById("hu-lvlup-sub");
+  const huWinTargetEl   = document.getElementById("hu-win-target");
+  const huFeedbackEl    = document.getElementById("hu-feedback");
+  const huSpeedLevelEl  = document.getElementById("hu-speed-level");
+  const huStreakEl      = document.getElementById("hu-streak");
+  const huBestEl        = document.getElementById("hu-best");
+  const huTargetButtons = document.querySelectorAll(".hu-target-btn");
+
+  const HU_BEST_KEY = "huntBestByProfile_v1";
+
+  let huTarget = "do";
+  let huState  = "idle"; // "idle" | "memorize" | "playing" | "paused" | "levelup" | "won"
+  let huActive = [];
+  let huSvg = null;
+  let huNoteGroup = null;
+  let huLastSpawn = 0;
+  let huLastFrame = 0;
+  let huRAF = null;
+  let huHitLineX = 120;
+  let huSpawnX = 800;
+  let huCurrentSpeed = 1;
+  let huStreak = 0;
+  let huCorrect = 0;
+
+  function huLoadBest() {
+    try { return JSON.parse(localStorage.getItem(HU_BEST_KEY) || "{}"); }
+    catch (e) { return {}; }
+  }
+  function huSaveBest(all) {
+    try { localStorage.setItem(HU_BEST_KEY, JSON.stringify(all)); } catch (e) {}
+  }
+  function huConfigKey() {
+    return huClefSelect.value + "|L" + huLevelSelect.value + "|T" + huTarget + "|v" + huCurrentSpeed;
+  }
+  function getHuBest() {
+    const all = huLoadBest();
+    return (all[currentProfile()] || {})[huConfigKey()] || 0;
+  }
+  function setHuBest(v) {
+    const all = huLoadBest();
+    if (!all[currentProfile()]) all[currentProfile()] = {};
+    all[currentProfile()][huConfigKey()] = v;
+    huSaveBest(all);
+  }
+
+  function huPxPerSec() { return 30 + huCurrentSpeed * 25; }
+  function huPxPerMs()  { return huPxPerSec() / 1000; }
+  function huSpawnInterval() {
+    const lvl = huCurrentSpeed;
+    const spaceBetweenPx = Math.max(35, 220 - lvl * 22);
+    return Math.max(80, (spaceBetweenPx / huPxPerSec()) * 1000);
+  }
+  function huPickClef() {
+    const sel = huClefSelect.value;
+    if (sel === "both") return Math.random() < 0.5 ? "treble" : "bass";
+    return sel;
+  }
+
+  function huBuildStage() {
+    const old = huContainer.querySelectorAll("svg");
+    old.forEach(s => s.remove());
+    const width  = Math.max(600, huContainer.clientWidth);
+    const height = 460;
+    huSpawnX  = width - 30;
+    huHitLineX = 120;
+
+    const renderer = new VF.Renderer(huContainer, VF.Renderer.Backends.SVG);
+    renderer.resize(width, height);
+    const context = renderer.getContext();
+    huSvg = context.svg;
+    huSvg.style.position = "absolute";
+    huSvg.style.left = "0";
+    huSvg.style.top = "0";
+    huSvg.style.zIndex = "1";
+
+    const staveX = 20, staveWidth = width - 40;
+    const trebleStave = new VF.Stave(staveX, 140, staveWidth);
+    trebleStave.addClef("treble").setContext(context).draw();
+    const bassStave = new VF.Stave(staveX, 280, staveWidth);
+    bassStave.addClef("bass").setContext(context).draw();
+    const ct = VF.StaveConnector.type;
+    new VF.StaveConnector(trebleStave, bassStave).setType(ct.BRACE).setContext(context).draw();
+    new VF.StaveConnector(trebleStave, bassStave).setType(ct.SINGLE_LEFT).setContext(context).draw();
+    new VF.StaveConnector(trebleStave, bassStave).setType(ct.SINGLE_RIGHT).setContext(context).draw();
+
+    const hitLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    hitLine.setAttribute("x1", huHitLineX);
+    hitLine.setAttribute("x2", huHitLineX);
+    hitLine.setAttribute("y1", 40);
+    hitLine.setAttribute("y2", 440);
+    hitLine.setAttribute("stroke", "#e74c3c");
+    hitLine.setAttribute("stroke-width", "3");
+    hitLine.setAttribute("stroke-dasharray", "6,4");
+    huSvg.appendChild(hitLine);
+
+    huNoteGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    huSvg.appendChild(huNoteGroup);
+  }
+
+  // Fase memoritzar: dibuixa totes les posicions de la diana en cian, estàtiques
+  function huShowMemorize() {
+    huState = "memorize";
+    if (huRAF) { cancelAnimationFrame(huRAF); huRAF = null; }
+    huBuildStage();
+    const clefs = huClefSelect.value === "both" ? ["treble", "bass"] : [huClefSelect.value];
+    const level = parseInt(huLevelSelect.value, 10) || 3;
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    // Distribuïm les posicions-diana uniformement entre hitLine i spawn
+    let targetEntries = [];
+    clefs.forEach(clef => {
+      const pool = (level === 3 || !LEVELS[level]) ? RANGES[clef] : LEVELS[level][clef];
+      pool.filter(n => noteLetter(n) === huTarget).forEach(n => targetEntries.push({ clef, note: n }));
+    });
+    // Espaiat horitzontal
+    const startX = huHitLineX + 80;
+    const endX = huSpawnX - 40;
+    const usable = Math.max(1, endX - startX);
+    const step = targetEntries.length > 1 ? usable / (targetEntries.length - 1) : 0;
+    targetEntries.forEach((e, i) => {
+      const x = targetEntries.length === 1 ? (startX + usable / 2) : (startX + step * i);
+      const y = spNoteY(e.note, e.clef);
+      const g = document.createElementNS(SVG_NS, "g");
+      g.classList.add("hu-memo-note");
+      spDrawLedgers(g, SVG_NS, y, e.clef);
+      spDrawQuarterNote(g, SVG_NS, y, e.clef);
+      g.style.transform = "translate3d(" + x + "px, " + y + "px, 0)";
+      // Ressalta en cian (fill + stroke)
+      g.querySelectorAll("ellipse").forEach(el => {
+        el.setAttribute("fill", "#00A8B3");
+        el.setAttribute("stroke", "#00A8B3");
+      });
+      g.querySelectorAll("line").forEach(el => el.setAttribute("stroke", "#00A8B3"));
+      huNoteGroup.appendChild(g);
+    });
+    huShowOverlay(huOvStart);
+    huRefreshBestUI();
+    huStreakEl.textContent = "0";
+    huSpeedLevelEl.textContent = huCurrentSpeed;
+  }
+
+  function huStart() {
+    huState = "playing";
+    huCurrentSpeed = parseInt(huSpeedSelect.value, 10) || huCurrentSpeed;
+    huStreak = 0;
+    huCorrect = 0;
+    if (huNoteGroup) huNoteGroup.innerHTML = "";
+    huActive = [];
+    huHideOverlay();
+    huLastFrame = 0;
+    huLastSpawn = 0;
+    huUpdateStats();
+    huRAF = requestAnimationFrame(huGameLoop);
+  }
+
+  function huGameLoop(ts) {
+    if (huState !== "playing") return;
+    if (!huLastFrame) huLastFrame = ts;
+    const dt = Math.min(50, ts - huLastFrame);
+    huLastFrame = ts;
+    const dx = huPxPerMs() * dt;
+
+    for (let i = huActive.length - 1; i >= 0; i--) {
+      const n = huActive[i];
+      n.x -= dx;
+      n.el.style.transform = "translate3d(" + n.x + "px, " + n.y + "px, 0)";
+
+      if (n.state === "pending" && n.x < huHitLineX - 20) {
+        if (noteLetter(n.note) === huTarget) {
+          // Diana que se'ns ha escapat → game over
+          huFail(n, "Has deixat passar una " + huTarget.toUpperCase());
+          return;
+        }
+        // No-diana: només la eliminem
+        if (n.el.parentNode) n.el.parentNode.removeChild(n.el);
+        huActive.splice(i, 1);
+      }
+    }
+
+    if (ts - huLastSpawn >= huSpawnInterval()) {
+      huSpawnNote();
+      huLastSpawn = ts;
+    }
+
+    huRAF = requestAnimationFrame(huGameLoop);
+  }
+
+  function huSpawnNote() {
+    const clef = huPickClef();
+    const note = pickNoteForLevel(clef, huLevelSelect.value);
+    const y = spNoteY(note, clef);
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    const g = document.createElementNS(SVG_NS, "g");
+    g.classList.add("hu-note");
+    spDrawLedgers(g, SVG_NS, y, clef);
+    spDrawQuarterNote(g, SVG_NS, y, clef);
+    g.style.transform = "translate3d(" + huSpawnX + "px, " + y + "px, 0)";
+    g.style.pointerEvents = "all";
+    g.style.cursor = "pointer";
+
+    // Zona clicable més gran per facilitar el toc al mòbil
+    const hit = document.createElementNS(SVG_NS, "rect");
+    hit.setAttribute("x", -18);
+    hit.setAttribute("y", -28);
+    hit.setAttribute("width", 36);
+    hit.setAttribute("height", 56);
+    hit.setAttribute("fill", "rgba(0,0,0,0.001)");
+    g.appendChild(hit);
+
+    const obj = { clef, note, x: huSpawnX, y, el: g, state: "pending" };
+    const handler = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      huOnNoteClick(obj);
+    };
+    g.addEventListener("click", handler);
+    g.addEventListener("touchend", handler);
+
+    huNoteGroup.appendChild(g);
+    huActive.push(obj);
+  }
+
+  function huOnNoteClick(n) {
+    if (huState !== "playing") return;
+    if (n.state !== "pending") return;
+    const letter = noteLetter(n.note);
+    if (letter === huTarget) {
+      n.state = "hit";
+      huStreak++;
+      huCorrect++;
+      playNote(n.note);
+      spColorNote(n.el, "#27ae60");
+      burstNoteAt(n.el, ["#00F0FF", "#00FF94", "#FFB800", "#FF10F0"], 24);
+      flashHitLine();
+      tickCounter(huStreakEl);
+      huUpdateStats();
+      const el = n.el;
+      setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 160);
+      const idx = huActive.indexOf(n);
+      if (idx >= 0) huActive.splice(idx, 1);
+      if (huStreak >= SP_STREAK_TO_ADVANCE) huLevelUp();
+    } else {
+      huFail(n, "Això era un " + NOTE_NAMES_CA[letter].toUpperCase() +
+                ", no un " + NOTE_NAMES_CA[huTarget].toUpperCase());
+    }
+  }
+
+  function huFail(n, msg) {
+    if (huState !== "playing") return;
+    huState = "paused";
+    if (huRAF) { cancelAnimationFrame(huRAF); huRAF = null; }
+    playErrorSound();
+    shakeElement(huContainer);
+    spColorNote(n.el, "#e74c3c");
+    burstNoteAt(n.el, ["#FF3366", "#9A1750", "#BC4749"], 18);
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    const label = document.createElementNS(SVG_NS, "text");
+    label.setAttribute("x", 0);
+    label.setAttribute("y", -18);
+    label.setAttribute("text-anchor", "middle");
+    label.setAttribute("font-size", "18");
+    label.setAttribute("font-weight", "bold");
+    label.setAttribute("fill", "#e74c3c");
+    label.textContent = NOTE_NAMES_CA[noteLetter(n.note)].toUpperCase();
+    n.el.appendChild(label);
+
+    // Rècord per aquesta configuració (clef+level+target+speed)
+    const prevBest = getHuBest();
+    let extra = "";
+    if (huCorrect > prevBest) {
+      setHuBest(huCorrect);
+      extra = " · 🏆 Nou rècord (" + huCorrect + ")";
+      playCongratulations();
+    } else if (huCorrect > 0 && huCorrect === prevBest) {
+      extra = " · 👍 Empat (" + huCorrect + ")";
+      playEncouragement();
+    } else if (prevBest > 0) {
+      extra = " · (millor: " + prevBest + ")";
+    }
+    huOvFailSub.textContent = msg + " · " + huCorrect + "/" + SP_STREAK_TO_ADVANCE + extra;
+    huShowOverlay(huOvFail);
+    huRefreshBestUI();
+  }
+
+  function huLevelUp() {
+    if (huCurrentSpeed >= SP_MAX_SPEED) {
+      huWin();
+      return;
+    }
+    huState = "levelup";
+    if (huRAF) { cancelAnimationFrame(huRAF); huRAF = null; }
+    const prevBest = getHuBest();
+    if (huCorrect > prevBest) setHuBest(huCorrect);
+    spawnConfetti({ count: 80 });
+    playCongratulations();
+    const passed = huCurrentSpeed;
+    huCurrentSpeed++;
+    huStreak = 0; huCorrect = 0;
+    huLvlUpTitle.textContent = "Velocitat " + passed + " superada!";
+    huLvlUpSub.textContent = "Avances a la velocitat " + huCurrentSpeed;
+    huSpeedSelect.value = String(huCurrentSpeed);
+    huSpeedSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    huUpdateStats();
+    huShowOverlay(huOvLevelUp);
+    huRefreshBestUI();
+
+    setTimeout(() => {
+      if (huState !== "levelup") return;
+      huActive.forEach(x => { if (x.el.parentNode) x.el.parentNode.removeChild(x.el); });
+      huActive = [];
+      huHideOverlay();
+      huState = "playing";
+      huLastFrame = 0; huLastSpawn = 0;
+      huRAF = requestAnimationFrame(huGameLoop);
+    }, 1500);
+  }
+
+  function huWin() {
+    huState = "won";
+    if (huRAF) { cancelAnimationFrame(huRAF); huRAF = null; }
+    const prevBest = getHuBest();
+    if (huCorrect > prevBest) setHuBest(huCorrect);
+    spawnConfetti({ count: 200 });
+    playCongratulations();
+    huWinTargetEl.textContent = NOTE_NAMES_CA[huTarget].toUpperCase();
+    huShowOverlay(huOvWin);
+    huRefreshBestUI();
+  }
+
+  function huRetry() {
+    huActive.forEach(x => { if (x.el.parentNode) x.el.parentNode.removeChild(x.el); });
+    huActive = [];
+    huStreak = 0; huCorrect = 0;
+    huUpdateStats();
+    huShowMemorize();
+  }
+  function huRestart() {
+    huCurrentSpeed = 1;
+    huSpeedSelect.value = "1";
+    huSpeedSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    huStreak = 0; huCorrect = 0;
+    huActive.forEach(x => { if (x.el.parentNode) x.el.parentNode.removeChild(x.el); });
+    huActive = [];
+    huUpdateStats();
+    huShowMemorize();
+  }
+
+  function huShowOverlay(panel) {
+    huOverlay.classList.remove("hidden");
+    [huOvStart, huOvFail, huOvLevelUp, huOvWin].forEach(p => p.classList.add("hidden"));
+    if (panel) panel.classList.remove("hidden");
+  }
+  function huHideOverlay() { huOverlay.classList.add("hidden"); }
+
+  function huUpdateStats() {
+    huSpeedLevelEl.textContent = huCurrentSpeed;
+    huStreakEl.textContent = huStreak;
+    huRefreshBestUI();
+  }
+  function huRefreshBestUI() {
+    const best = getHuBest();
+    huBestEl.textContent = best > 0 ? (best + "/" + SP_STREAK_TO_ADVANCE) : "—";
+  }
+
+  function huSetTarget(letter) {
+    huTarget = letter;
+    huTargetLabelEl.textContent = NOTE_NAMES_CA[letter].toUpperCase();
+    huTargetButtons.forEach(b => b.classList.toggle("is-selected", b.dataset.note === letter));
+    // Canvi de diana → reinicia partida (nou memoritzar)
+    huCurrentSpeed = parseInt(huSpeedSelect.value, 10) || huCurrentSpeed;
+    huStreak = 0; huCorrect = 0;
+    huActive.forEach(x => { if (x.el.parentNode) x.el.parentNode.removeChild(x.el); });
+    huActive = [];
+    huUpdateStats();
+    huShowMemorize();
+  }
+
+  function huEnterScreen() {
+    huCurrentSpeed = parseInt(huSpeedSelect.value, 10) || 1;
+    huSetTarget(huTarget);
+  }
+
+  huStartBtn.addEventListener("click", huStart);
+  huRetryBtn.addEventListener("click", huRetry);
+  huRestartBtn.addEventListener("click", huRestart);
+  huTargetButtons.forEach(btn => {
+    btn.addEventListener("click", () => huSetTarget(btn.dataset.note));
+  });
+  huClefSelect.addEventListener("change", () => huSetTarget(huTarget));
+  huLevelSelect.addEventListener("change", () => huSetTarget(huTarget));
+  huSpeedSelect.addEventListener("change", () => {
+    const v = parseInt(huSpeedSelect.value, 10);
+    if (!isNaN(v) && v >= 1 && v <= SP_MAX_SPEED) huCurrentSpeed = v;
+    // Si estàvem jugant, qualsevol canvi reinicia (coherent amb la resta)
+    if (huState !== "idle") huSetTarget(huTarget);
+  });
+
   // ---------- NAVEGACIÓ PESTANYES ----------
   const tabs    = document.querySelectorAll(".tab");
   const screens = document.querySelectorAll(".screen");
@@ -3054,6 +3470,7 @@
       spFeedbackEl.textContent = "";
       spFeedbackEl.className = "feedback";
     }
+    if (screenId === "hunt") huEnterScreen();
   }
 
   tabs.forEach(tab => {

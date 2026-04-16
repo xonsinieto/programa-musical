@@ -69,7 +69,7 @@
       <button class="tab active" data-screen="reference">Referència</button>
       <button class="tab" data-screen="train">Lectura</button>
       <button class="tab" data-screen="speed">Velocitat</button>
-<!-- Relàmpec tret a petició de l'usuari; tornarà com a joc de memòria -->
+      <button class="tab" data-screen="hunt">Caça</button>
     </nav>
   </header>
 
@@ -335,6 +335,89 @@
         <span>Encerts: <strong id="sp-correct">0</strong></span>
         <span>Errors: <strong id="sp-wrong">0</strong></span>
         <span>Millor: <strong id="sp-best">—</strong></span>
+      </div>
+    </section>
+
+    <!-- CAÇA (tria una nota, memoritza-la al pentagrama, després caça-la entre notes aleatòries) -->
+    <section id="screen-hunt" class="screen">
+      <div class="controls">
+        <label>
+          Clau:
+          <select id="hu-clef-select">
+            <option value="treble">Sol</option>
+            <option value="bass">Fa</option>
+            <option value="both" selected>Les dues</option>
+          </select>
+        </label>
+        <label>
+          Nivell:
+          <select id="hu-level-select">
+            <option value="1" selected>1 - Bàsic</option>
+            <option value="2">2 - Intermedi</option>
+            <option value="3">3 - Avançat</option>
+          </select>
+        </label>
+        <label>
+          Velocitat:
+          <select id="hu-speed-select">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+          </select>
+        </label>
+        <div class="hu-target-info">
+          Diana: <strong id="hu-target-label">DO</strong>
+        </div>
+      </div>
+
+      <div id="hu-game-container">
+        <div id="hu-overlay">
+          <div id="hu-ov-start" class="sp-ov-panel">
+            <h2>Caça la nota</h2>
+            <p>Tria una diana a baix (<strong>Do/Re/…</strong>) i memoritza on cauen totes a dalt.<br>Prem Començar: vindran notes aleatòries. Cliquen la diana. Si erres, s'acaba.</p>
+            <button id="hu-start-btn" class="big-start">Començar</button>
+          </div>
+          <div id="hu-ov-fail" class="sp-ov-panel hidden">
+            <h2>Has fallat</h2>
+            <p id="hu-ov-fail-sub"></p>
+            <button id="hu-retry-btn" class="big-start">Torna-ho a provar</button>
+          </div>
+          <div id="hu-ov-levelup" class="sp-ov-panel hidden">
+            <h2 id="hu-lvlup-title">Velocitat 1 superada!</h2>
+            <p id="hu-lvlup-sub">Avances a la velocitat 2</p>
+          </div>
+          <div id="hu-ov-win" class="sp-ov-panel hidden">
+            <h2>Felicitats!</h2>
+            <p>Has superat totes les velocitats caçant <strong id="hu-win-target">DO</strong>.</p>
+            <button id="hu-restart-btn" class="big-start">Jugar de nou</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="hu-feedback" class="feedback"></div>
+
+      <!-- Selector de diana: clickar aquí canvia la nota que cacem i reinicia -->
+      <div class="answer-buttons hu-target-buttons">
+        <button class="note-btn hu-target-btn is-selected" data-note="do">Do</button>
+        <button class="note-btn hu-target-btn" data-note="re">Re</button>
+        <button class="note-btn hu-target-btn" data-note="mi">Mi</button>
+        <button class="note-btn hu-target-btn" data-note="fa">Fa</button>
+        <button class="note-btn hu-target-btn" data-note="sol">Sol</button>
+        <button class="note-btn hu-target-btn" data-note="la">La</button>
+        <button class="note-btn hu-target-btn" data-note="si">Si</button>
+      </div>
+
+      <div class="stats">
+        <span>Velocitat: <strong id="hu-speed-level">1</strong>/10</span>
+        <span>Ratxa: <strong id="hu-streak">0</strong>/30</span>
+        <span>Millor: <strong id="hu-best">—</strong></span>
       </div>
     </section>
   </main>
