@@ -1289,8 +1289,9 @@
     if (document.getElementById("screen-reference").classList.contains("active")) {
       renderReference();
     }
-    if (document.getElementById("screen-flashcards").classList.contains("active") && fcCurrent) {
-      renderSingleOnGrandStaff(fcContainer, fcCurrent.clef, fcCurrent.note, "#3498db");
+    const srScreen = document.getElementById("screen-sightread");
+    if (srScreen && srScreen.classList.contains("active")) {
+      srRender();
     }
     if (document.getElementById("screen-speed").classList.contains("active") && spRunning) {
       spBuildStage();
@@ -1807,78 +1808,339 @@
     bv.draw(context, bassStave);
   }
 
-  // ---------- FLASHCARDS ----------
-  const fcClefSelect  = document.getElementById("fc-clef-select");
-  const fcLevelSelect = document.getElementById("fc-level-select");
-  const fcResetBtn    = document.getElementById("fc-reset-btn");
-  const fcContainer  = document.getElementById("fc-staff-container");
-  const fcAnswerEl   = document.getElementById("fc-answer");
-  const fcRevealBtn  = document.getElementById("fc-reveal-btn");
-  const fcKnewBtn    = document.getElementById("fc-knew-btn");
-  const fcDidntBtn   = document.getElementById("fc-didnt-btn");
-  const fcSeenEl     = document.getElementById("fc-seen");
-  const fcKnewEl     = document.getElementById("fc-knew");
-  const fcRateEl     = document.getElementById("fc-rate");
+  // ---------- LECTURA PRO (sight-read trainer) ----------
+  const srLevelEl    = document.getElementById("sr-level");
+  const srDurationEl = document.getElementById("sr-duration");
+  const srStartBtn   = document.getElementById("sr-start-btn");
+  const srStopBtn    = document.getElementById("sr-stop-btn");
+  const srContainer  = document.getElementById("sr-staff-container");
+  const srFeedbackEl = document.getElementById("sr-feedback");
+  const srTimeEl     = document.getElementById("sr-time");
+  const srCountEl    = document.getElementById("sr-count");
+  const srNpmEl      = document.getElementById("sr-npm");
+  const srAccEl      = document.getElementById("sr-acc");
+  const srBestEl     = document.getElementById("sr-best");
+  const srNoteButtons = document.querySelectorAll(".sr-note-btn");
 
-  let fcCurrent = null;
-  let fcRevealed = false;
-  let fcSeen = 0;
-  let fcKnew = 0;
+  const SR_BATCH_SIZE = 20;
+  const SR_WEIGHTS_KEY = "srWeightsByProfile_v1";
+  const SR_BEST_KEY = "srBestByProfile_v1";
 
-  function fcPickClef() {
-    const sel = fcClefSelect.value;
-    if (sel === "both") return Math.random() < 0.5 ? "treble" : "bass";
-    return sel;
+  let srState = "idle"; // idle | playing | complete
+  let srBatch = [];
+  let srIdx = 0;
+  let srCorrect = 0;
+  let srTotalAnswers = 0;
+  let srErrorsOnCurrent = 0;
+  let srStartTime = 0;
+  let srTimerInterval = null;
+  let srDurationMs = 120000;
+  let srNoteStartTime = 0;
+
+  function srLoadWeights() {
+    try { return JSON.parse(localStorage.getItem(SR_WEIGHTS_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function srSaveWeights(all) {
+    try { localStorage.setItem(SR_WEIGHTS_KEY, JSON.stringify(all)); } catch (e) {}
+  }
+  function srGetProfileWeights() {
+    const all = srLoadWeights();
+    return all[currentProfile()] || {};
+  }
+  function srSaveProfileWeights(w) {
+    const all = srLoadWeights();
+    all[currentProfile()] = w;
+    srSaveWeights(all);
   }
 
-  function fcNewCard() {
-    const clef = fcPickClef();
-    const note = pickNoteForLevel(clef, fcLevelSelect.value);
-    fcCurrent = { clef, note };
-    fcRevealed = false;
-    fcAnswerEl.textContent = "";
-    fcRevealBtn.disabled = false;
-    fcKnewBtn.disabled = true;
-    fcDidntBtn.disabled = true;
-    renderSingleOnGrandStaff(fcContainer, clef, note, "#3498db");
+  function srLoadBest() {
+    try { return JSON.parse(localStorage.getItem(SR_BEST_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function srSaveBest(all) {
+    try { localStorage.setItem(SR_BEST_KEY, JSON.stringify(all)); } catch (e) {}
+  }
+  function srGetBest() {
+    const all = srLoadBest();
+    const profileBest = all[currentProfile()] || {};
+    return profileBest[srLevelEl.value] || 0;
+  }
+  function srSetBest(npm) {
+    const all = srLoadBest();
+    if (!all[currentProfile()]) all[currentProfile()] = {};
+    all[currentProfile()][srLevelEl.value] = npm;
+    srSaveBest(all);
   }
 
-  function fcReveal() {
-    if (!fcCurrent || fcRevealed) return;
-    fcRevealed = true;
-    const name = NOTE_NAMES_CA[noteLetter(fcCurrent.note)].toUpperCase();
-    fcAnswerEl.textContent = name;
-    flashClass(fcAnswerEl, "revealed", 720);
-    fcRevealBtn.disabled = true;
-    fcKnewBtn.disabled = false;
-    fcDidntBtn.disabled = false;
-    playNote(fcCurrent.note);
+  function srGetRange() {
+    const lvl = parseInt(srLevelEl.value, 10);
+    if (lvl === 1) {
+      return [
+        ...LEVELS[1].treble.map(n => ({ clef: "treble", note: n })),
+        ...LEVELS[1].bass.map(n => ({ clef: "bass", note: n })),
+      ];
+    }
+    if (lvl === 2) {
+      return [
+        ...LEVELS[2].treble.map(n => ({ clef: "treble", note: n })),
+        ...LEVELS[2].bass.map(n => ({ clef: "bass", note: n })),
+      ];
+    }
+    return [
+      ...RANGES.treble.map(n => ({ clef: "treble", note: n })),
+      ...RANGES.bass.map(n => ({ clef: "bass", note: n })),
+    ];
   }
 
-  function fcMark(knew) {
-    if (!fcRevealed) return;
-    fcSeen++;
-    if (knew) fcKnew++;
-    fcSeenEl.textContent = fcSeen;
-    fcKnewEl.textContent = fcKnew;
-    fcRateEl.textContent = fcSeen === 0 ? "—" : Math.round((fcKnew / fcSeen) * 100) + "%";
-    fcNewCard();
+  function srWeightKey(entry) { return entry.clef + "|" + entry.note; }
+
+  function srBuildBatch() {
+    const range = srGetRange();
+    const weights = srGetProfileWeights();
+    const batch = [];
+    for (let i = 0; i < SR_BATCH_SIZE; i++) {
+      let totalWeight = 0;
+      for (const e of range) totalWeight += Math.max(1, weights[srWeightKey(e)] || 1);
+      let r = Math.random() * totalWeight;
+      for (const e of range) {
+        r -= Math.max(1, weights[srWeightKey(e)] || 1);
+        if (r <= 0) { batch.push({ clef: e.clef, note: e.note }); break; }
+      }
+    }
+    return batch;
   }
 
-  function fcReset() {
-    fcSeen = 0; fcKnew = 0;
-    fcSeenEl.textContent = 0;
-    fcKnewEl.textContent = 0;
-    fcRateEl.textContent = "—";
-    fcNewCard();
+  // Algoritme de spaced repetition simple:
+  // correct ràpid (<1.5s) → weight-- (menys prioritat)
+  // correct lent (>3s) → weight+
+  // incorrecte → weight += 2 (prioritat alta)
+  function srUpdateWeight(entry, correct, timeMs) {
+    const weights = srGetProfileWeights();
+    const k = srWeightKey(entry);
+    let w = weights[k] || 2;
+    if (!correct) {
+      w = Math.min(20, w + 3);
+    } else if (timeMs < 1500) {
+      w = Math.max(1, w - 1);
+    } else if (timeMs > 3000) {
+      w = Math.min(20, w + 1);
+    }
+    weights[k] = w;
+    srSaveProfileWeights(weights);
   }
 
-  fcRevealBtn.addEventListener("click", fcReveal);
-  fcKnewBtn.addEventListener("click", () => fcMark(true));
-  fcDidntBtn.addEventListener("click", () => fcMark(false));
-  fcResetBtn.addEventListener("click", fcReset);
-  fcClefSelect.addEventListener("change", fcNewCard);
-  fcLevelSelect.addEventListener("change", fcNewCard);
+  function srRender() {
+    srContainer.innerHTML = "";
+    if (srBatch.length === 0) return;
+
+    const containerWidth = Math.max(400, srContainer.clientWidth);
+    const height = 360;
+    const staveX = 20;
+    const staveWidth = containerWidth - staveX - 20;
+    const trebleY = 100;
+    const bassY = 220;
+
+    const renderer = new VF.Renderer(srContainer, VF.Renderer.Backends.SVG);
+    renderer.resize(containerWidth, height);
+    const context = renderer.getContext();
+
+    const trebleStave = new VF.Stave(staveX, trebleY, staveWidth);
+    trebleStave.addClef("treble").setContext(context).draw();
+    const bassStave = new VF.Stave(staveX, bassY, staveWidth);
+    bassStave.addClef("bass").setContext(context).draw();
+
+    const ct = VF.StaveConnector.type;
+    new VF.StaveConnector(trebleStave, bassStave).setType(ct.BRACE).setContext(context).draw();
+    new VF.StaveConnector(trebleStave, bassStave).setType(ct.SINGLE_LEFT).setContext(context).draw();
+    new VF.StaveConnector(trebleStave, bassStave).setType(ct.SINGLE_RIGHT).setContext(context).draw();
+
+    const COLOR_DONE    = "#6B7280";
+    const COLOR_CURRENT = "#00F0FF";
+    const COLOR_ERROR   = "#FF3366";
+    const COLOR_UPCOMING = "#E8ECF1";
+
+    function colorFor(i) {
+      if (i < srIdx) return COLOR_DONE;
+      if (i === srIdx) return srErrorsOnCurrent > 0 ? COLOR_ERROR : COLOR_CURRENT;
+      return COLOR_UPCOMING;
+    }
+
+    const trebleNotes = srBatch.map((step, i) => {
+      const col = colorFor(i);
+      const sn = step.clef === "treble"
+        ? new VF.StaveNote({ clef: "treble", keys: [step.note], duration: "q" })
+        : new VF.StaveNote({ clef: "treble", keys: ["b/4"], duration: "qr" });
+      sn.setStyle({ fillStyle: col, strokeStyle: col });
+      return sn;
+    });
+
+    const bassNotes = srBatch.map((step, i) => {
+      const col = colorFor(i);
+      const sn = step.clef === "bass"
+        ? new VF.StaveNote({ clef: "bass", keys: [step.note], duration: "q" })
+        : new VF.StaveNote({ clef: "bass", keys: ["d/3"], duration: "qr" });
+      sn.setStyle({ fillStyle: col, strokeStyle: col });
+      return sn;
+    });
+
+    const tv = new VF.Voice({ num_beats: srBatch.length, beat_value: 4 }).setMode(VF.Voice.Mode.SOFT).addTickables(trebleNotes);
+    const bv = new VF.Voice({ num_beats: srBatch.length, beat_value: 4 }).setMode(VF.Voice.Mode.SOFT).addTickables(bassNotes);
+
+    new VF.Formatter().joinVoices([tv, bv]).format([tv, bv], Math.max(150, staveWidth - 80));
+    tv.draw(context, trebleStave);
+    bv.draw(context, bassStave);
+  }
+
+  function srFormatTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return m + ":" + String(s).padStart(2, "0");
+  }
+
+  function srUpdateStats() {
+    const elapsedMs = performance.now() - srStartTime;
+    const elapsedSec = elapsedMs / 1000;
+    const npm = elapsedSec > 0 ? Math.round((srCorrect / elapsedSec) * 60) : 0;
+    const acc = srTotalAnswers > 0 ? Math.round((srCorrect / srTotalAnswers) * 100) : 0;
+    srCountEl.textContent = srCorrect;
+    srNpmEl.textContent = npm;
+    srAccEl.textContent = srTotalAnswers === 0 ? "—" : acc + "%";
+  }
+
+  function srUpdateTimeDisplay() {
+    if (srState !== "playing") return;
+    const elapsed = performance.now() - srStartTime;
+    const remaining = Math.max(0, srDurationMs - elapsed);
+    srTimeEl.textContent = srFormatTime(Math.ceil(remaining / 1000));
+    srUpdateStats();
+    if (remaining <= 0) srEnd();
+  }
+
+  function srRefreshBestUI() {
+    const best = srGetBest();
+    srBestEl.textContent = best > 0 ? best + " NPM" : "—";
+  }
+
+  function srHandleAnswer(answerCa, btn) {
+    if (srState !== "playing") return;
+    if (!srBatch[srIdx]) return;
+    const current = srBatch[srIdx];
+    const correctCa = NOTE_NAMES_CA[noteLetter(current.note)];
+    const timeMs = performance.now() - srNoteStartTime;
+
+    if (answerCa === correctCa) {
+      srCorrect++;
+      srTotalAnswers++;
+      srUpdateWeight(current, true, timeMs);
+      playNote(current.note);
+      btn.classList.add("correct-flash");
+      srIdx++;
+      srErrorsOnCurrent = 0;
+      srNoteStartTime = performance.now();
+      if (srIdx >= srBatch.length) {
+        srBatch = srBuildBatch();
+        srIdx = 0;
+      }
+      srRender();
+    } else {
+      srTotalAnswers++;
+      srErrorsOnCurrent++;
+      srUpdateWeight(current, false, timeMs);
+      playErrorSound();
+      shakeElement(srContainer);
+      btn.classList.add("wrong-flash");
+      srRender();
+    }
+    setTimeout(() => {
+      btn.classList.remove("correct-flash", "wrong-flash");
+    }, 200);
+    srUpdateStats();
+  }
+
+  function srStart() {
+    srState = "playing";
+    srDurationMs = parseInt(srDurationEl.value, 10) * 1000;
+    srCorrect = 0;
+    srTotalAnswers = 0;
+    srErrorsOnCurrent = 0;
+    srStartTime = performance.now();
+    srNoteStartTime = srStartTime;
+    srBatch = srBuildBatch();
+    srIdx = 0;
+    srRender();
+    srUpdateStats();
+    srStartBtn.disabled = true;
+    srStopBtn.disabled = false;
+    srLevelEl.disabled = true;
+    srDurationEl.disabled = true;
+    srTimerInterval = setInterval(srUpdateTimeDisplay, 100);
+    srUpdateTimeDisplay();
+    srFeedbackEl.textContent = "Endavant!";
+    srFeedbackEl.className = "feedback correct";
+    flashClass(srFeedbackEl, "pop", 400);
+  }
+
+  function srEnd() {
+    if (srState !== "playing") return;
+    srState = "complete";
+    clearInterval(srTimerInterval);
+    srStartBtn.disabled = false;
+    srStopBtn.disabled = true;
+    srLevelEl.disabled = false;
+    srDurationEl.disabled = false;
+    srTimeEl.textContent = "0:00";
+
+    const elapsedSec = (performance.now() - srStartTime) / 1000;
+    const npm = elapsedSec > 0 ? Math.round((srCorrect / elapsedSec) * 60) : 0;
+    const prevBest = srGetBest();
+
+    if (npm > prevBest) {
+      srSetBest(npm);
+      srFeedbackEl.textContent = `🎉 ${npm} NPM · Nou rècord de lectura!`;
+      srFeedbackEl.className = "feedback correct";
+      playCongratulations();
+      spawnConfetti({ count: 100 });
+    } else {
+      srFeedbackEl.textContent = `${npm} NPM (millor: ${prevBest} NPM)`;
+      srFeedbackEl.className = "feedback";
+    }
+    flashClass(srFeedbackEl, "pop", 400);
+    srRefreshBestUI();
+  }
+
+  function srStop() {
+    if (srState === "playing") srEnd();
+  }
+
+  function srEnterScreen() {
+    // en entrar a la pantalla, dibuixem un pentagrama buit o amb una demo
+    srRefreshBestUI();
+    if (srState !== "playing") {
+      srBatch = srBuildBatch();
+      srIdx = 0;
+      srErrorsOnCurrent = 0;
+      srRender();
+      srFeedbackEl.textContent = "Prem Començar per iniciar.";
+      srFeedbackEl.className = "feedback";
+      srTimeEl.textContent = srFormatTime(parseInt(srDurationEl.value, 10));
+      srCountEl.textContent = "0";
+      srNpmEl.textContent = "0";
+      srAccEl.textContent = "—";
+    }
+  }
+
+  srStartBtn.addEventListener("click", srStart);
+  srStopBtn.addEventListener("click", srStop);
+  srNoteButtons.forEach(btn => {
+    btn.addEventListener("click", () => srHandleAnswer(btn.dataset.note, btn));
+  });
+  srLevelEl.addEventListener("change", () => {
+    if (srState === "idle" || srState === "complete") {
+      srBatch = srBuildBatch();
+      srIdx = 0;
+      srRender();
+      srRefreshBestUI();
+    }
+  });
 
   // ---------- VELOCITAT (joc scrolling amb progressió) ----------
   const spClefSelect   = document.getElementById("sp-clef-select");
@@ -2422,8 +2684,7 @@
       if (sequence.length === 0) startRound();
       else render();
     }
-    if (screenId === "flashcards" && !fcCurrent) fcNewCard();
-    else if (screenId === "flashcards") renderSingleOnGrandStaff(fcContainer, fcCurrent.clef, fcCurrent.note, "#3498db");
+    if (screenId === "sightread") srEnterScreen();
     if (screenId === "speed" && !spRunning) {
       spShowOverlay(spOvStart);
       spFeedbackEl.textContent = "";

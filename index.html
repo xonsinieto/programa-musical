@@ -68,7 +68,7 @@
       <button class="tab active" data-screen="reference">Referència</button>
       <button class="tab" data-screen="train">Entrenament</button>
       <button class="tab" data-screen="speed">Velocitat</button>
-      <button class="tab" data-screen="flashcards">Flashcards</button>
+      <button class="tab" data-screen="sightread">Lectura Pro</button>
     </nav>
   </header>
 
@@ -158,42 +158,49 @@
       <div id="ref-staff-container"></div>
     </section>
 
-    <!-- FLASHCARDS -->
-    <section id="screen-flashcards" class="screen">
+    <!-- LECTURA PRO (sight-read trainer amb spaced repetition) -->
+    <section id="screen-sightread" class="screen">
       <div class="controls">
         <label>
-          Clau:
-          <select id="fc-clef-select">
-            <option value="treble">Sol</option>
-            <option value="bass">Fa</option>
-            <option value="both" selected>Les dues (aleatori)</option>
+          Nivell:
+          <select id="sr-level">
+            <option value="1" selected>1 - Principiant</option>
+            <option value="2">2 - Piano</option>
+            <option value="3">3 - Pro</option>
           </select>
         </label>
         <label>
-          Nivell:
-          <select id="fc-level-select">
-            <option value="1" selected>1 - Bàsic</option>
-            <option value="2">2 - Intermedi</option>
-            <option value="3">3 - Avançat</option>
+          Durada:
+          <select id="sr-duration">
+            <option value="60">1 min</option>
+            <option value="120" selected>2 min</option>
+            <option value="300">5 min</option>
           </select>
         </label>
-        <button id="fc-reset-btn">Reiniciar</button>
+        <button id="sr-start-btn" class="big-start">Començar</button>
+        <button id="sr-stop-btn" disabled>Aturar</button>
       </div>
 
-      <div id="fc-staff-container"></div>
+      <div id="sr-staff-container"></div>
 
-      <div id="fc-answer" class="fc-answer"></div>
+      <div id="sr-feedback" class="feedback"></div>
 
-      <div class="fc-buttons">
-        <button id="fc-reveal-btn" class="big-btn reveal">Mostra resposta</button>
-        <button id="fc-knew-btn"   class="big-btn knew"   disabled>La sabia</button>
-        <button id="fc-didnt-btn"  class="big-btn didnt"  disabled>No la sabia</button>
+      <div class="answer-buttons">
+        <button class="note-btn sr-note-btn" data-note="do">Do</button>
+        <button class="note-btn sr-note-btn" data-note="re">Re</button>
+        <button class="note-btn sr-note-btn" data-note="mi">Mi</button>
+        <button class="note-btn sr-note-btn" data-note="fa">Fa</button>
+        <button class="note-btn sr-note-btn" data-note="sol">Sol</button>
+        <button class="note-btn sr-note-btn" data-note="la">La</button>
+        <button class="note-btn sr-note-btn" data-note="si">Si</button>
       </div>
 
       <div class="stats">
-        <span>Vistes: <strong id="fc-seen">0</strong></span>
-        <span>Sabudes: <strong id="fc-knew">0</strong></span>
-        <span>Encert: <strong id="fc-rate">—</strong></span>
+        <span>Temps: <strong id="sr-time">—</strong></span>
+        <span>Notes: <strong id="sr-count">0</strong></span>
+        <span>NPM: <strong id="sr-npm">0</strong></span>
+        <span>Precisió: <strong id="sr-acc">—</strong></span>
+        <span>Millor: <strong id="sr-best">—</strong></span>
       </div>
     </section>
 
