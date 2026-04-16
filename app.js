@@ -3061,4 +3061,135 @@
   });
 
   renderReference();
+
+  // ---------- CUSTOM DROPDOWN (substitueix el picker natiu mòbil) ----------
+  // Manté el <select> original (oculta però accessible per codi existent via id/value/
+  // addEventListener("change") i MutationObserver detecta canvis dinàmics a <option>).
+  // Mostra un popover inline amb fons cream #F6EFE0 en comptes del native full-screen picker.
+  function initCustomSelects() {
+    const selects = Array.from(document.querySelectorAll("select"));
+    selects.forEach(sel => {
+      if (sel.dataset.xselInit === "1") return;
+      sel.dataset.xselInit = "1";
+
+      const wrap = document.createElement("div");
+      wrap.className = "xsel";
+
+      const trigger = document.createElement("button");
+      trigger.type = "button";
+      trigger.className = "xsel-trigger";
+      trigger.setAttribute("aria-haspopup", "listbox");
+      trigger.setAttribute("aria-expanded", "false");
+
+      const valueSpan = document.createElement("span");
+      valueSpan.className = "xsel-value";
+
+      const chev = document.createElement("span");
+      chev.className = "xsel-chevron";
+      chev.setAttribute("aria-hidden", "true");
+
+      trigger.appendChild(valueSpan);
+      trigger.appendChild(chev);
+
+      const pop = document.createElement("div");
+      pop.className = "xsel-popover";
+      pop.setAttribute("role", "listbox");
+      pop.hidden = true;
+
+      function refreshLabel() {
+        const opt = sel.options[sel.selectedIndex];
+        valueSpan.textContent = opt ? opt.textContent : "";
+      }
+      function refreshOptions() {
+        pop.innerHTML = "";
+        Array.from(sel.options).forEach(o => {
+          const div = document.createElement("div");
+          div.className = "xsel-option";
+          div.dataset.value = o.value;
+          div.textContent = o.textContent;
+          div.setAttribute("role", "option");
+          if (o.selected) div.setAttribute("aria-selected", "true");
+          if (o.disabled) div.classList.add("is-disabled");
+          div.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (o.disabled) return;
+            sel.value = o.value;
+            sel.dispatchEvent(new Event("change", { bubbles: true }));
+            refreshLabel();
+            refreshOptions();
+            closeAll();
+          });
+          pop.appendChild(div);
+        });
+      }
+      function openPop() {
+        closeAll();
+        pop.hidden = false;
+        trigger.setAttribute("aria-expanded", "true");
+        wrap.classList.add("xsel-open");
+        // Ajustar direcció (amunt si no cabra avall)
+        requestAnimationFrame(() => {
+          const r = pop.getBoundingClientRect();
+          const overflow = r.bottom > (window.innerHeight - 8);
+          wrap.classList.toggle("xsel-drop-up", overflow);
+        });
+      }
+      function closePop() {
+        pop.hidden = true;
+        trigger.setAttribute("aria-expanded", "false");
+        wrap.classList.remove("xsel-open", "xsel-drop-up");
+      }
+
+      trigger.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (sel.disabled) return;
+        if (pop.hidden) openPop();
+        else closePop();
+      });
+
+      // Si codi extern canvia el valor del <select>, refresquem UI
+      sel.addEventListener("change", () => { refreshLabel(); refreshOptions(); });
+      // Canvis a opcions (ex: song-select populat dinàmicament)
+      const mo = new MutationObserver(() => { refreshLabel(); refreshOptions(); });
+      mo.observe(sel, { childList: true, subtree: true });
+      // Canvis a l'atribut disabled → reflectir-ho al trigger
+      const mo2 = new MutationObserver(() => {
+        trigger.disabled = sel.disabled;
+      });
+      mo2.observe(sel, { attributes: true, attributeFilter: ["disabled"] });
+
+      // Inserim al DOM: wrap agafa el lloc del select, el select queda ocult dins del wrap.
+      const parent = sel.parentNode;
+      parent.insertBefore(wrap, sel);
+      wrap.appendChild(trigger);
+      wrap.appendChild(pop);
+      wrap.appendChild(sel);
+      sel.setAttribute("aria-hidden", "true");
+      sel.tabIndex = -1;
+
+      refreshLabel();
+      refreshOptions();
+    });
+
+    function closeAll() {
+      document.querySelectorAll(".xsel-popover").forEach(p => p.hidden = true);
+      document.querySelectorAll(".xsel-trigger").forEach(t => t.setAttribute("aria-expanded", "false"));
+      document.querySelectorAll(".xsel").forEach(w => w.classList.remove("xsel-open", "xsel-drop-up"));
+    }
+
+    if (!window.__xselGlobalsWired) {
+      window.__xselGlobalsWired = true;
+      document.addEventListener("click", (e) => {
+        if (e.target.closest(".xsel")) return;
+        closeAll();
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeAll();
+      });
+    }
+  }
+
+  initCustomSelects();
 })();
