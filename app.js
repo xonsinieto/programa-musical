@@ -3035,7 +3035,7 @@
   const huRestartBtn    = document.getElementById("hu-restart-btn");
   const huContainer     = document.getElementById("hu-game-container");
   const huOverlay       = document.getElementById("hu-overlay");
-  const huOvStart       = document.getElementById("hu-ov-start");
+  const huMemoBar       = document.getElementById("hu-memo-bar");
   const huOvFail        = document.getElementById("hu-ov-fail");
   const huOvLevelUp     = document.getElementById("hu-ov-levelup");
   const huOvWin         = document.getElementById("hu-ov-win");
@@ -3178,7 +3178,8 @@
       g.querySelectorAll("line").forEach(el => el.setAttribute("stroke", "#00A8B3"));
       huNoteGroup.appendChild(g);
     });
-    huShowOverlay(huOvStart);
+    // Mostra la barra translúcida "Memoritza els XX · Començar" SENSE tapar el pentagrama
+    huShowMemoBar();
     huRefreshBestUI();
     huStreakEl.textContent = "0";
     huSpeedLevelEl.textContent = huCurrentSpeed;
@@ -3406,11 +3407,19 @@
   }
 
   function huShowOverlay(panel) {
+    if (huMemoBar) huMemoBar.classList.add("hidden");
     huOverlay.classList.remove("hidden");
-    [huOvStart, huOvFail, huOvLevelUp, huOvWin].forEach(p => p.classList.add("hidden"));
+    [huOvFail, huOvLevelUp, huOvWin].forEach(p => p.classList.add("hidden"));
     if (panel) panel.classList.remove("hidden");
   }
-  function huHideOverlay() { huOverlay.classList.add("hidden"); }
+  function huHideOverlay() {
+    huOverlay.classList.add("hidden");
+    if (huMemoBar) huMemoBar.classList.add("hidden");
+  }
+  function huShowMemoBar() {
+    huOverlay.classList.add("hidden");
+    if (huMemoBar) huMemoBar.classList.remove("hidden");
+  }
 
   function huUpdateStats() {
     huSpeedLevelEl.textContent = huCurrentSpeed;
@@ -3429,11 +3438,9 @@
     const caName = NOTE_NAMES_CA[letter]; // "do", "re", ...
     const caUpper = caName.toUpperCase();
     huTargetLabelEl.textContent = caUpper;
-    // Actualitza l'overlay "Memoritza els DO/RE/..."
-    const ovTargetEl = document.getElementById("hu-ov-target");
-    const ovTargetCaEl = document.getElementById("hu-ov-target-ca");
-    if (ovTargetEl) ovTargetEl.textContent = caUpper;
-    if (ovTargetCaEl) ovTargetCaEl.textContent = caUpper;
+    // Actualitza el text de la barra de memorització ("Memoritza els DO/RE/...")
+    const memoTargetEl = document.getElementById("hu-memo-target");
+    if (memoTargetEl) memoTargetEl.textContent = caUpper;
     huTargetButtons.forEach(b => b.classList.toggle("is-selected", b.dataset.note === caName));
     // Canvi de diana → reinicia partida (nou memoritzar)
     huCurrentSpeed = parseInt(huSpeedSelect.value, 10) || huCurrentSpeed;

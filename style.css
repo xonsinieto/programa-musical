@@ -2585,6 +2585,76 @@ main {
   opacity: 0;
 }
 
+/* Barra de memorització: flota a la part baixa del game-container, NO tapa el pentagrama */
+.hu-memo-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px 22px;
+  padding: 14px 20px 16px;
+  background: linear-gradient(to top, rgba(5, 7, 15, 0.92) 30%, rgba(5, 7, 15, 0.6) 70%, transparent);
+  backdrop-filter: blur(8px) saturate(1.2);
+  -webkit-backdrop-filter: blur(8px) saturate(1.2);
+  animation: huMemoBarIn 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes huMemoBarIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.hu-memo-bar.hidden { display: none; }
+.hu-memo-text {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: rgba(232, 236, 241, 0.85);
+}
+.hu-memo-label {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.78rem;
+  color: rgba(232, 236, 241, 0.65);
+}
+.hu-memo-bar strong {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 1.9rem;
+  background: linear-gradient(100deg, #00F0FF, #FF10F0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: 0.02em;
+}
+.hu-memo-hint {
+  font-size: 0.76rem;
+  color: rgba(232, 236, 241, 0.55);
+  letter-spacing: 0.04em;
+}
+.hu-memo-start {
+  font-size: 0.95rem !important;
+  padding: 11px 26px !important;
+}
+@media (max-width: 600px) {
+  .hu-memo-bar {
+    padding: 10px 12px 12px;
+    gap: 8px 14px;
+  }
+  .hu-memo-text { font-size: 0.78rem; gap: 6px; }
+  .hu-memo-label { font-size: 0.64rem; letter-spacing: 0.1em; }
+  .hu-memo-bar strong { font-size: 1.4rem; }
+  .hu-memo-hint { display: none; }
+  .hu-memo-start { font-size: 0.85rem !important; padding: 9px 18px !important; }
+}
+
 /* Notes del pentagrama Caça: cursor pointer i zoom lleuger en hover (desktop) */
 .hu-note {
   will-change: transform;

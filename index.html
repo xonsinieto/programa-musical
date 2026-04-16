@@ -442,12 +442,17 @@
       </div>
 
       <div id="hu-game-container">
-        <div id="hu-overlay">
-          <div id="hu-ov-start" class="sp-ov-panel">
-            <h2>Memoritza els <strong id="hu-ov-target">DO</strong></h2>
-            <p>Mira on cauen totes les <strong id="hu-ov-target-ca">Do</strong> al pentagrama, a totes les octaves i les dues claus. Quan les tinguis a cap, prem <strong>Començar</strong> i caça-les abans que creuin la línia!</p>
-            <button id="hu-start-btn" class="big-start">Començar</button>
+        <!-- Barra translúcida de memorització: es veu el pentagrama al darrere -->
+        <div id="hu-memo-bar" class="hu-memo-bar hidden">
+          <div class="hu-memo-text">
+            <span class="hu-memo-label">Memoritza els</span>
+            <strong id="hu-memo-target">DO</strong>
+            <span class="hu-memo-hint">· mira les notes cian al pentagrama</span>
           </div>
+          <button id="hu-start-btn" class="big-start hu-memo-start">Començar</button>
+        </div>
+        <!-- Overlay només per estats de fi de partida (fallat / puja nivell / guanyat) -->
+        <div id="hu-overlay" class="hidden">
           <div id="hu-ov-fail" class="sp-ov-panel hidden">
             <h2>Has fallat</h2>
             <p id="hu-ov-fail-sub"></p>
@@ -533,12 +538,25 @@
       requestAnimationFrame(raf);
     })();
   </script>
-  <!-- PWA install FAB — listeners per beforeinstallprompt + appinstalled -->
+  <!-- PWA install FAB — sempre visible (menys dins la PWA); usa beforeinstallprompt
+       quan estigui disponible, i un fallback amb instruccions clares quan no. -->
   <script>
     (function () {
       const fab = document.getElementById("install-fab");
       if (!fab) return;
       let deferred = null;
+
+      // Ja està instal·lada i oberta com a PWA? Amaga del tot.
+      const isStandalone =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        window.navigator.standalone === true;
+      if (isStandalone) {
+        fab.style.display = "none";
+        return;
+      }
+
+      // Mostrem el FAB de seguida (encara que beforeinstallprompt no es dispari)
+      fab.classList.remove("hidden");
 
       window.addEventListener("beforeinstallprompt", (e) => {
         e.preventDefault();
@@ -548,28 +566,34 @@
 
       window.addEventListener("appinstalled", () => {
         fab.classList.add("hidden");
+        fab.style.display = "none";
         deferred = null;
       });
+
+      // Detecció iOS/Android per donar instruccions específiques al fallback
+      const ua = navigator.userAgent || "";
+      const isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Mac") && "ontouchend" in document);
+      const isAndroid = /Android/.test(ua);
 
       fab.addEventListener("click", async () => {
-        if (!deferred) {
-          // Fallback: dona una pista si el navegador no ofereix install (iOS, ja instal·lada, etc.)
-          alert("Per instal·lar l'app:\n\n• Android Chrome: menú ⋮ → 'Afegir a pantalla d'inici' o 'Instal·lar app'.\n• iPhone Safari: botó Compartir → 'Afegir a pantalla d'inici'.\n\nSi no surt, potser ja la tens instal·lada (busca 'Lectura Notes' a les apps) o has d'esborrar les dades del lloc al navegador.");
+        if (deferred) {
+          deferred.prompt();
+          try { await deferred.userChoice; } catch (e) {}
+          deferred = null;
+          fab.classList.add("hidden");
           return;
         }
-        deferred.prompt();
-        try {
-          await deferred.userChoice;
-        } catch (e) {}
-        deferred = null;
-        fab.classList.add("hidden");
+        // Fallback: instruccions específiques del dispositiu
+        let msg;
+        if (isIOS) {
+          msg = "Per instal·lar a iPhone/iPad:\n\n1) Prem el botó Compartir (📤) a la barra de Safari\n2) Busca 'Afegir a pantalla d'inici'\n3) Prem Afegir\n\nL'app apareixerà com una icona al teu inici.";
+        } else if (isAndroid) {
+          msg = "Per instal·lar a Android:\n\n1) Obre el menú ⋮ del navegador (dalt a la dreta)\n2) Busca 'Instal·lar app' o 'Afegir a pantalla d'inici'\n3) Prem Instal·lar\n\nSi no surt l'opció:\n• Potser ja la tens instal·lada (busca 'Lectura Notes' a les apps)\n• O esborra dades del lloc: Configuració → Privacitat → Esborra dades";
+        } else {
+          msg = "Per instal·lar l'app:\n\n• Chrome/Edge: busca la icona ⊕ a la barra d'adreces, o menú ⋮ → Instal·lar\n• Safari iOS: botó Compartir → Afegir a pantalla d'inici\n• Android Chrome: menú ⋮ → Instal·lar app";
+        }
+        alert(msg);
       });
-
-      // Si ja està en mode standalone (PWA instal·lada oberta), oculta el FAB
-      if (window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true) {
-        fab.classList.add("hidden");
-        fab.style.display = "none";
-      }
     })();
   </script>
   <script src="app.js"></script>
