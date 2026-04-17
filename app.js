@@ -3530,10 +3530,15 @@
         drawPartNames: false,
         autoResize: true,
         pageFormat: "Endless", // tota la partitura seguida, scroll vertical
-        pageBackgroundColor: "#F6EFE0"
+        pageBackgroundColor: "#F6EFE0",
+        drawingParameters: "compact" // compacte: més compassos per línia, com al PDF original
       });
 
       await ptOsmd.load(xmlText);
+      // Ajusta zoom per obtenir 5-6 compassos per sistema (com al PDF de MuseScore).
+      // Al mòbil reduïm més perquè l'amplada és escassa.
+      const isMobile = window.innerWidth < 600;
+      ptOsmd.zoom = isMobile ? 0.55 : 0.75;
       ptOsmd.render();
 
       const info = [
