@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v30-rodones";
+const CACHE = "lectura-notes-v31-partitures";
 const FILES = [
   "./",
   "./index.html",
@@ -7,7 +7,9 @@ const FILES = [
   "./manifest.json",
   "./icon.svg",
   "./icon-192.png",
-  "./icon-512.png"
+  "./icon-512.png",
+  "./partitures/index.json",
+  "./partitures/poem-without-words-2.mxl"
 ];
 
 self.addEventListener("install", (event) => {

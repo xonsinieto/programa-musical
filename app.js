@@ -3438,6 +3438,143 @@
     if (huState !== "idle") huSetTarget(huTarget);
   });
 
+  // ---------- PARTITURES (render MusicXML via OSMD — prototip visual) ----------
+  const ptSelect       = document.getElementById("pt-select");
+  const ptInfoEl       = document.getElementById("pt-info");
+  const ptContainer    = document.getElementById("pt-staff-container");
+  let ptOsmd = null;
+  let ptCatalog = null; // llista de partitures (del index.json)
+  let ptInitialized = false;
+  let ptLastLoadedId = null;
+
+  async function ptLoadCatalog() {
+    if (ptCatalog) return ptCatalog;
+    try {
+      const resp = await fetch("partitures/index.json", { cache: "no-cache" });
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      ptCatalog = await resp.json();
+    } catch (e) {
+      ptCatalog = [];
+      console.error("[Partitures] No s'ha pogut carregar index.json:", e);
+    }
+    return ptCatalog;
+  }
+
+  function ptPopulateSelect(catalog) {
+    ptSelect.innerHTML = "";
+    if (!catalog.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "(cap partitura disponible)";
+      ptSelect.appendChild(opt);
+      return;
+    }
+    catalog.forEach(item => {
+      const opt = document.createElement("option");
+      opt.value = item.id;
+      opt.textContent = item.name + (item.author ? " — " + item.author : "");
+      ptSelect.appendChild(opt);
+    });
+    // Si el select està dins d'un .xsel (custom dropdown), notifica el canvi d'opcions
+    ptSelect.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  // Carrega .mxl o .xml des del repo, descomprimeix si cal i retorna XML text
+  async function ptLoadMusicXmlText(fileName) {
+    const url = "partitures/" + fileName;
+    const resp = await fetch(url, { cache: "no-cache" });
+    if (!resp.ok) throw new Error("No s'ha pogut carregar " + fileName + " (HTTP " + resp.status + ")");
+    if (fileName.toLowerCase().endsWith(".mxl")) {
+      if (typeof JSZip === "undefined") throw new Error("JSZip no carregat");
+      const buf = await resp.arrayBuffer();
+      const zip = await JSZip.loadAsync(buf);
+      // Busca la ruta del fitxer principal via META-INF/container.xml
+      let rootPath = null;
+      const containerFile = zip.file("META-INF/container.xml");
+      if (containerFile) {
+        const ctext = await containerFile.async("string");
+        const cdoc = new DOMParser().parseFromString(ctext, "text/xml");
+        const rf = cdoc.querySelector("rootfile");
+        if (rf) rootPath = rf.getAttribute("full-path");
+      }
+      if (!rootPath) {
+        const names = Object.keys(zip.files).filter(n =>
+          !zip.files[n].dir && !n.startsWith("META-INF") && /\.(xml|musicxml)$/i.test(n)
+        );
+        rootPath = names[0];
+      }
+      if (!rootPath) throw new Error("Fitxer .mxl sense XML vàlid");
+      return await zip.file(rootPath).async("string");
+    }
+    return await resp.text();
+  }
+
+  async function ptRenderPartitura(item) {
+    ptInfoEl.textContent = "Carregant " + item.name + "…";
+    ptContainer.innerHTML = ""; // buida qualsevol render anterior
+
+    try {
+      const xmlText = await ptLoadMusicXmlText(item.file);
+
+      if (typeof opensheetmusicdisplay === "undefined") {
+        throw new Error("OpenSheetMusicDisplay no s'ha carregat des del CDN");
+      }
+
+      // Cal una nova instància per cada re-render (evita problemes d'estat intern)
+      ptOsmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(ptContainer, {
+        backend: "svg",
+        drawTitle: true,
+        drawComposer: true,
+        drawCredits: false,
+        drawSubtitle: false,
+        drawPartNames: false,
+        autoResize: true,
+        pageFormat: "Endless", // tota la partitura seguida, scroll vertical
+        pageBackgroundColor: "#F6EFE0"
+      });
+
+      await ptOsmd.load(xmlText);
+      ptOsmd.render();
+
+      const info = [
+        item.name,
+        item.author ? "de " + item.author : "",
+        item.timeSignature ? "· " + item.timeSignature : "",
+        item.keySignature ? "· " + item.keySignature : "",
+        item.measures ? "· " + item.measures + " compassos" : ""
+      ].filter(Boolean).join(" ");
+      ptInfoEl.textContent = info;
+      ptLastLoadedId = item.id;
+    } catch (e) {
+      ptInfoEl.textContent = "⚠️ Error: " + (e.message || e);
+      ptContainer.innerHTML = "<p style='padding:20px;color:#FF3366;font-family:var(--font-mono)'>No s'ha pogut renderitzar la partitura.<br>" + (e.message || "") + "</p>";
+      console.error("[Partitures] Error:", e);
+    }
+  }
+
+  async function ptEnterScreen() {
+    if (!ptInitialized) {
+      ptInitialized = true;
+      const catalog = await ptLoadCatalog();
+      ptPopulateSelect(catalog);
+      ptSelect.addEventListener("change", () => {
+        const id = ptSelect.value;
+        const item = (ptCatalog || []).find(p => p.id === id);
+        if (item) ptRenderPartitura(item);
+      });
+    }
+    const catalog = ptCatalog || [];
+    if (!catalog.length) {
+      ptInfoEl.textContent = "Encara no hi ha partitures disponibles.";
+      return;
+    }
+    const id = ptSelect.value || catalog[0].id;
+    if (id !== ptLastLoadedId) {
+      const item = catalog.find(p => p.id === id);
+      if (item) await ptRenderPartitura(item);
+    }
+  }
+
   // ---------- NAVEGACIÓ PESTANYES ----------
   const tabs    = document.querySelectorAll(".tab");
   const screens = document.querySelectorAll(".screen");
@@ -3457,6 +3594,7 @@
       spFeedbackEl.className = "feedback";
     }
     if (screenId === "hunt") huEnterScreen();
+    if (screenId === "partitures") ptEnterScreen();
   }
 
   tabs.forEach(tab => {

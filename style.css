@@ -2502,6 +2502,56 @@ main {
 }
 
 /* ==================================================================
+   PARTITURES — render MusicXML (OSMD) sobre paper cream, scroll vertical
+   ================================================================== */
+#pt-staff-container {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto 20px;
+  padding: 20px 18px;
+  background:
+    radial-gradient(ellipse at center, transparent 60%, rgba(90, 70, 40, 0.08) 100%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.3 0 0 0 0 0.24 0 0 0 0.12 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"),
+    linear-gradient(135deg, rgba(0, 240, 255, 0.025) 0%, rgba(255, 16, 240, 0.025) 100%),
+    #F6EFE0;
+  color: #12162D;
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.35),
+    0 20px 60px rgba(0, 0, 0, 0.45),
+    inset 0 0 50px rgba(140, 100, 60, 0.08);
+  min-height: 400px;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+#pt-staff-container svg {
+  display: block;
+  margin: 0 auto;
+}
+.pt-info {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: rgba(232, 236, 241, 0.75);
+  letter-spacing: 0.06em;
+  padding: 6px 12px;
+  margin: 4px auto 10px;
+}
+@media (max-width: 600px) {
+  #pt-staff-container {
+    padding: 12px 8px;
+    margin: 0 3px 12px;
+    border-radius: 12px;
+    min-height: 300px;
+  }
+  .pt-info {
+    font-size: 0.65rem;
+    padding: 4px 8px;
+    margin: 3px auto 6px;
+  }
+}
+
+/* ==================================================================
    PWA INSTALL FAB — botó flotant per instal·lar si el navegador ho permet
    ================================================================== */
 .install-fab {

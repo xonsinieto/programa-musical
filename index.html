@@ -39,6 +39,7 @@
   <script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.3/build/cjs/vexflow.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.0/build/opensheetmusicdisplay.min.js"></script>
 </head>
 <body>
   <!-- SPLASH D'ENTRADA (cosmic aurora + logo animat + títol brillant) -->
@@ -131,6 +132,7 @@
       <button class="tab" data-screen="train">Lectura</button>
       <button class="tab" data-screen="speed">Velocitat</button>
       <button class="tab" data-screen="hunt">Caça</button>
+      <button class="tab" data-screen="partitures">Partitures</button>
     </nav>
   </header>
 
@@ -489,6 +491,18 @@
         <span>Ratxa: <strong id="hu-streak">0</strong>/30</span>
         <span>Millor: <strong id="hu-best">—</strong></span>
       </div>
+    </section>
+
+    <!-- PARTITURES (prototip B: render només, sense interacció, per validar visualment) -->
+    <section id="screen-partitures" class="screen">
+      <div class="controls">
+        <label>
+          Partitura:
+          <select id="pt-select"></select>
+        </label>
+      </div>
+      <div id="pt-info" class="pt-info"></div>
+      <div id="pt-staff-container"></div>
     </section>
   </main>
 
