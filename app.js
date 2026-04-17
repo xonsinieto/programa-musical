@@ -3748,13 +3748,17 @@
   }
 
   function ptIsRestNote(n) {
-    try { return n.isRest ? n.isRest() : (n.isRest === true); }
-    catch (e) { return false; }
+    // En OSMD `isRest` és un getter booleà, no una funció.
+    return !!(n && (n.isRest === true));
   }
 
   function ptActiveNotesAtCursor() {
+    // Temporal: no filtrem per staff perquè la detecció (idInMusicSheet) no és
+    // fiable a la versió d'OSMD actual. Agafem TOTES les notes de la posició
+    // del cursor (tot just descartant els silencis). Més endavant, quan
+    // implementem detecció de staff robusta, afegirem el filtre per clau activa.
     const all = ptCursorNotes();
-    return all.filter(n => ptNoteStaffIndex(n) === ptActiveStaff && !ptIsRestNote(n));
+    return all.filter(n => !ptIsRestNote(n));
   }
 
   // Format d'una nota: "RE♭4", "SOL5", etc.

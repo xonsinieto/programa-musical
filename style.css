@@ -2601,15 +2601,8 @@ main {
   box-shadow: 0 2px 8px rgba(0, 240, 255, 0.3);
 }
 
-/* Cursor d'OSMD: que sigui cian (mateix color principal de l'app) */
-#pt-staff-container img[id^="cursorImg"],
-#pt-staff-container [class*="cursor"] {
-  /* OSMD afegeix el cursor com a element img o div posicionat absolutament */
-}
-/* Intent via opacitat de filter — hue-rotate cap a cian */
-#pt-staff-container img[id^="cursorImg"] {
-  filter: hue-rotate(180deg) saturate(2);
-}
+/* Cursor d'OSMD: deixem el color per defecte d'OSMD (groc/verd semi-transparent)
+   — el filter hue-rotate anterior el convertia en rosa, que no era l'efecte volgut. */
 
 /* Piano fix a sota de la pantalla quan practiques a Partitures */
 .pt-piano {
@@ -2650,9 +2643,10 @@ body.pt-practicing #screen-partitures { padding-bottom: 170px; }
   flex: 0 0 auto;
   pointer-events: none;
 }
-/* Espai per separar Mi-Fa (no hi ha tecla negra entre ells) */
-.pt-spacer-half { width: 32px; }      /* mitja tecla blanca al principi i al final */
-.pt-spacer-full { width: 68px; }      /* una tecla blanca al mig (Mi-Fa) */
+/* Espai per separar Mi-Fa (no hi ha tecla negra entre ells).
+   Ajustat als nous tamanys de tecla (nat 72 wide). */
+.pt-spacer-half { width: 36px; }      /* mitja tecla blanca al principi i al final */
+.pt-spacer-full { width: 76px; }      /* una tecla blanca al mig (Mi-Fa) */
 
 /* Tecla genèrica */
 .pt-key {
@@ -2668,12 +2662,12 @@ body.pt-practicing #screen-partitures { padding-bottom: 170px; }
 /* Tecles blanques (naturals) */
 .pt-key-nat {
   flex: 0 0 auto;
-  width: 64px;
-  height: 56px;
+  width: 72px;
+  height: 68px;
   background: linear-gradient(#FDF8EC, #F6EFE0);
   border: 1px solid #CBB48A;
   color: #1a1a1a;
-  font-size: 1rem;
+  font-size: 1.1rem;
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4), inset 0 -2px 0 rgba(150, 120, 70, 0.3);
 }
 .pt-key-nat:hover {
@@ -2686,22 +2680,23 @@ body.pt-practicing #screen-partitures { padding-bottom: 170px; }
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
-/* Tecles negres (accidentals) */
+/* Tecles negres (accidentals) — més llargues estil piano real */
 .pt-key-acc {
   flex: 0 0 auto;
-  width: 48px;
-  height: 44px;
+  width: 52px;
+  height: 62px;
   background: linear-gradient(#1a1a1a, #0a0a0a);
   border: 1px solid #000;
   color: #e8ecf1;
-  font-size: 0.76rem;
-  line-height: 1;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6), inset 0 -2px 0 rgba(0, 0, 0, 0.5);
+  font-size: 0.82rem;
+  line-height: 1.1;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.7), inset 0 -3px 0 rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
+  gap: 2px;
+  padding: 3px;
 }
 .pt-key-acc small {
   font-size: 0.55rem;
@@ -2731,12 +2726,12 @@ body.pt-practicing #screen-partitures { padding-bottom: 170px; }
 }
 
 @media (max-width: 600px) {
-  .pt-piano { padding: 8px 6px 10px; }
-  .pt-key-nat { width: 42px; height: 48px; font-size: 0.85rem; }
-  .pt-key-acc { width: 32px; height: 38px; font-size: 0.62rem; }
-  .pt-key-acc small { font-size: 0.46rem; }
-  .pt-spacer-half { width: 21px; }
-  .pt-spacer-full { width: 46px; }
+  .pt-piano { padding: 8px 4px 10px; }
+  .pt-key-nat { width: 46px; height: 54px; font-size: 0.88rem; }
+  .pt-key-acc { width: 34px; height: 48px; font-size: 0.66rem; }
+  .pt-key-acc small { font-size: 0.48rem; }
+  .pt-spacer-half { width: 23px; }
+  .pt-spacer-full { width: 50px; }
 }
 
 @media (max-width: 600px) {
