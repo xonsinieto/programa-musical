@@ -3834,37 +3834,37 @@
   const PT_BLUE = "#1E90FF";
   const PT_RED  = "#E74C3C";
 
-  // Etiquetem les notes SVG directament via DOM (no API d'OSMD, que no té
-  // `getSVGGElement` a la v1.9). Estructura d'OSMD:
-  //   #pt-staff-container svg g.staffline[id='Instr. PX-Y']
-  //     > g.vf-measure
-  //       > g.vf-stavenote     ← la nota!
-  //
-  // Hi ha 2 stafflines per piano (Sol + Fa). Els identifiquem per ordre DOM:
-  // staffline[0] = Sol, staffline[1] = Fa.
-  //
-  // Dins cada staffline, els `.vf-stavenote` estan en ordre de lectura (compàs
-  // a compàs, esquerra a dreta). Els etiquetem amb `data-pt-sol="N"` o
-  // `data-pt-fa="N"` per poder-los trobar després.
-  //
-  // Nota: OSMD no distingeix voice 1 de voice 2 a nivell DOM, així que inclourem
-  // TOTES les notes d'un staff. Per tant, ptTrack (que filtra a voice 1) pot no
-  // coincidir nota a nota. Acceptem això per ara; és millor tenir ALGUNA nota
-  // blava que cap.
+  // Etiquetem només les notes de VOICE 1 al DOM. OSMD barreja voice 1 i voice 2
+  // dins d'una mateixa staffline (p.ex., Poem Without Words té una whole note
+  // voice 1 + 7 eighth notes voice 2 per compàs). Comptem quantes notes voice 1
+  // hi ha per compàs (des del parser) i només etiquetem aquestes primeres N.
   function ptLabelSVGNotes() {
     if (!ptContainer) return;
     const stafflines = ptContainer.querySelectorAll("svg g.staffline");
     if (stafflines.length === 0) return;
-    // OSMD produeix un STAFFLINE per cada LÍNIA VISUAL. Per 99 compassos
-    // partits en ~17 línies hi ha 17*2 = 34 stafflines. Les parelles són
-    // [treble, bass, treble, bass, ...]. slIdx%2==0 → Sol, %2==1 → Fa.
+    // Comptatge de notes voice 1 per (staff, measure)
+    // ptTrackAll té tots els events voice 1 de totes dues staves.
+    const countByStaffMeasure = { 1: {}, 2: {} };
+    ptTrackAll.forEach(ev => {
+      if (!countByStaffMeasure[ev.staff]) countByStaffMeasure[ev.staff] = {};
+      if (!countByStaffMeasure[ev.staff][ev.measure]) countByStaffMeasure[ev.staff][ev.measure] = 0;
+      countByStaffMeasure[ev.staff][ev.measure]++;
+    });
+    // Una staffline cada 2 és treble (Sol). Les parelles són [treble, bass].
     let iSol = 0, iFa = 0;
     stafflines.forEach((sl, slIdx) => {
       const isTreble = (slIdx % 2 === 0);
+      const xmlStaff = isTreble ? 1 : 2;
       const attr = isTreble ? "data-pt-sol" : "data-pt-fa";
-      const notes = sl.querySelectorAll("g.vf-stavenote");
-      notes.forEach(noteEl => {
-        noteEl.setAttribute(attr, isTreble ? iSol++ : iFa++);
+      sl.querySelectorAll("g.vf-measure").forEach(m => {
+        const measureNum = parseInt(m.id, 10);
+        const want = (countByStaffMeasure[xmlStaff] && countByStaffMeasure[xmlStaff][measureNum]) || 0;
+        const noteEls = m.querySelectorAll("g.vf-stavenote");
+        // Etiquetem les primeres `want` notes (assumim voice 1 és la primera).
+        const n = Math.min(want, noteEls.length);
+        for (let k = 0; k < n; k++) {
+          noteEls[k].setAttribute(attr, isTreble ? iSol++ : iFa++);
+        }
       });
     });
   }
@@ -3969,6 +3969,19 @@
       ptPressedInCurrent.add(semitone);
       btn.classList.add("correct-flash");
       setTimeout(() => btn.classList.remove("correct-flash"), 200);
+
+      // Toca el so de la nota real (pitch + octava) que l'usuari ha premut dins
+      // de l'acord actual — per reforçar l'aprenentatge auditiu.
+      try {
+        const ev = ptCurrentEvent();
+        if (ev) {
+          const note = ev.notes.find(n => n.semitone === semitone) || ev.notes[0];
+          if (note && playNote) {
+            const stepLow = note.step.toLowerCase();
+            playNote(stepLow + "/" + note.octave);
+          }
+        }
+      } catch (e) {}
 
       if (ptPressedInCurrent.size >= expected.size) {
         // Acord complet → avança + pinta la nova nota actual en blau
