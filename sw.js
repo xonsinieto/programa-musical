@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v40-adjust-panel";
+const CACHE = "lectura-notes-v41-crop-fix";
 const FILES = [
   "./",
   "./index.html",

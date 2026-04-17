@@ -3591,29 +3591,32 @@
           }
         });
 
-        // Retall del buit superior via viewBox
+        // Retall del buit superior via viewBox.
+        // IMPORTANT: escaneja NOMÉS elements-fulla (text, path, line), no <g>.
+        // Els <g> agrupadors solen començar a Y=0 (cobreixen tota la pàgina),
+        // i incloïen-los feia minY = 0 sempre → cap retall. També excloem
+        // descendents de <defs> perquè no es renderitzen.
         try {
-          // Troba la Y mínima de qualsevol element renderitzat (text, paths, lines)
           let minY = Infinity;
-          const elements = svg.querySelectorAll("text, path, line, g");
+          const elements = svg.querySelectorAll("text, path, line");
           elements.forEach(el => {
             if (!el.getBBox) return;
+            if (el.closest("defs")) return;
             try {
               const bb = el.getBBox();
               if (bb && bb.width > 0 && bb.height > 0 && bb.y < minY) minY = bb.y;
             } catch (e) { /* getBBox pot fallar en elements no renderitzats */ }
           });
-          // Si hi ha un buit significatiu (>20 unitats SVG), retallem
-          if (isFinite(minY) && minY > 20) {
+          // Detecció reeixida si hi ha un buit mesurable (>5 unitats)
+          const autoCrop = (isFinite(minY) && minY > 5) ? (minY - 4) : 0;
+          const cropY = Math.max(0, autoCrop) + (ptCfg.crop || 0);
+          if (cropY > 0) {
             const vb = svg.getAttribute("viewBox");
             if (vb) {
               const parts = vb.split(/\s+/).map(parseFloat);
               if (parts.length === 4) {
                 const [vx, vy, vw, vh] = parts;
-                // cropY = espai automàtic detectat + retall extra de l'usuari
-                const cropY = Math.max(0, minY - 8) + ptCfg.crop;
                 svg.setAttribute("viewBox", vx + " " + (vy + cropY) + " " + vw + " " + (vh - cropY));
-                // Ajusta també l'alçada intrínseca perquè no es distorsioni
                 const currentH = parseFloat(svg.getAttribute("height") || vh);
                 if (currentH > 0) {
                   svg.setAttribute("height", currentH - cropY);
