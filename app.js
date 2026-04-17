@@ -661,17 +661,17 @@
       .setType(connectorTypes.SINGLE_RIGHT).setContext(context).draw();
 
     const DUR_BEATS = { w: 4, h: 2, q: 1, "8": 0.5, "16": 0.25 };
+    // A petició de l'usuari: totes les notes es dibuixen com a rodones (whole
+    // notes) arreu, ignorant la durada original de la cançó/seqüència.
     const trebleNotes = sequence.map((step) => {
-      const d = step.dur || "q";
       return step.clef === "treble"
-        ? new VF.StaveNote({ clef: "treble", keys: [step.note], duration: d })
-        : new VF.StaveNote({ clef: "treble", keys: ["b/4"],      duration: d + "r" });
+        ? new VF.StaveNote({ clef: "treble", keys: [step.note], duration: "w" })
+        : new VF.StaveNote({ clef: "treble", keys: ["b/4"],      duration: "wr" });
     });
     const bassNotes = sequence.map((step) => {
-      const d = step.dur || "q";
       return step.clef === "bass"
-        ? new VF.StaveNote({ clef: "bass", keys: [step.note], duration: d })
-        : new VF.StaveNote({ clef: "bass", keys: ["d/3"],      duration: d + "r" });
+        ? new VF.StaveNote({ clef: "bass", keys: [step.note], duration: "w" })
+        : new VF.StaveNote({ clef: "bass", keys: ["d/3"],      duration: "wr" });
     });
 
     sequence.forEach((step, i) => {
@@ -2599,35 +2599,20 @@
   }
 
   function spDrawQuarterNote(parent, SVG_NS, y, clef) {
-    // Negra: cap ple + pal. Pal amunt si la nota és sota la línia central, avall altrament.
-    const midLine = clef === "treble" ? spTrebleCenterY : spBassCenterY;
-    const stemUp = y >= midLine;
-
+    // Rodona buida (whole note): oval horitzontal sense omplir, sense pal.
+    // S'usa arreu (Velocitat + Caça) a petició de l'usuari — simple i clar.
     const wrap = document.createElementNS(SVG_NS, "g");
     wrap.setAttribute("class", "sp-note-shape");
 
     const head = document.createElementNS(SVG_NS, "ellipse");
     head.setAttribute("cx", 0);
     head.setAttribute("cy", 0);
-    head.setAttribute("rx", 6);
-    head.setAttribute("ry", 4.5);
-    head.setAttribute("fill", "#2c3e50");
-    head.setAttribute("stroke", "none");
-    head.setAttribute("transform", "rotate(-18)");
+    head.setAttribute("rx", 8);
+    head.setAttribute("ry", 5.5);
+    head.setAttribute("fill", "none");
+    head.setAttribute("stroke", "#2c3e50");
+    head.setAttribute("stroke-width", "2");
     wrap.appendChild(head);
-
-    const stem = document.createElementNS(SVG_NS, "line");
-    const stemX = stemUp ? 5.5 : -5.5;
-    const stemY1 = stemUp ? -1 : 1;
-    const stemY2 = stemUp ? -34 : 34;
-    stem.setAttribute("x1", stemX);
-    stem.setAttribute("y1", stemY1);
-    stem.setAttribute("x2", stemX);
-    stem.setAttribute("y2", stemY2);
-    stem.setAttribute("stroke", "#2c3e50");
-    stem.setAttribute("stroke-width", "1.8");
-    stem.setAttribute("stroke-linecap", "square");
-    wrap.appendChild(stem);
 
     parent.appendChild(wrap);
   }
@@ -2635,8 +2620,9 @@
   function spColorNote(g, color) {
     const shape = g.querySelector(".sp-note-shape");
     if (!shape) return;
+    // Rodones buides: només canviem l'stroke (color del perímetre); mantenim
+    // fill="none" perquè la nota segueixi sent buida com una rodona real.
     shape.querySelectorAll("ellipse").forEach(el => {
-      el.setAttribute("fill", color);
       el.setAttribute("stroke", color);
     });
     shape.querySelectorAll("line").forEach(el => {

@@ -2722,17 +2722,14 @@ main {
   stroke: none;
   pointer-events: all;
 }
-/* Hover: canviem el color del cap de la nota (NO filter que dibuixaria aurèola
-   del rect sencer). Això es manté només a desktop. */
+/* Hover: canviem només l'stroke del perímetre de la rodona (fill queda buit
+   perquè la nota segueix semblant una rodona). NO filter (dibuixaria aurèola
+   del rect sencer). Només a desktop. */
 @media (hover: hover) {
   .hu-note:hover .sp-note-shape ellipse {
-    fill: #00F0FF;
     stroke: #00F0FF;
-    transition: fill 140ms ease, stroke 140ms ease;
-  }
-  .hu-note:hover .sp-note-shape line {
-    stroke: #00F0FF;
-    transition: stroke 140ms ease;
+    stroke-width: 2.5;
+    transition: stroke 140ms ease, stroke-width 140ms ease;
   }
 }
 
