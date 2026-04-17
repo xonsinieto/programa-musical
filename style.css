@@ -2601,6 +2601,16 @@ main {
   box-shadow: 0 2px 8px rgba(0, 240, 255, 0.3);
 }
 
+/* Cursor d'OSMD: que sigui cian (mateix color principal de l'app) */
+#pt-staff-container img[id^="cursorImg"],
+#pt-staff-container [class*="cursor"] {
+  /* OSMD afegeix el cursor com a element img o div posicionat absolutament */
+}
+/* Intent via opacitat de filter — hue-rotate cap a cian */
+#pt-staff-container img[id^="cursorImg"] {
+  filter: hue-rotate(180deg) saturate(2);
+}
+
 /* Piano fix a sota de la pantalla quan practiques a Partitures */
 .pt-piano {
   position: fixed;
