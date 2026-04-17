@@ -3447,7 +3447,12 @@
   const ptCopyBtn      = document.getElementById("pt-copy-btn");
   const ptResetBtn     = document.getElementById("pt-reset-btn");
   const PT_CFG_KEY     = "ptSpaceConfig_v1";
-  const PT_DEFAULTS    = { padding: 0, ttop: 1, tbot: 14, crop: 0, zoom: 0.65 };
+  // Valors per defecte del panell d'ajust (el user pot canviar-los amb els sliders):
+  // - padding 0: paper toca el contingut (no marge extra)
+  // - ttop 0, tbot 14: OSMD dibuixa títol a dalt i deixa respir gran abans del primer compàs
+  // - crop 60: talla 60px del buit superior del SVG (valor que s'apropa al que l'usuari vol)
+  // - zoom 0.65: mida de les notes
+  const PT_DEFAULTS    = { padding: 0, ttop: 0, tbot: 14, crop: 60, zoom: 0.65 };
 
   function ptLoadConfig() {
     try {
@@ -3574,10 +3579,8 @@
 
       // Post-processat del SVG:
       // 1) Treure qualsevol rectangle de fons (era el "dos papers" gris)
-      // 2) RETALLAR l'espai buit de dalt del SVG — detectem on comença el primer
-      //    element visible i ajustem el viewBox perquè el paper aprofiti l'espai
-      //    sense buit superior. Així el títol queda a prop del marge superior
-      //    del paper, com a un full imprès real.
+      // 2) RETALLAR l'espai buit de dalt via CSS clip-path + margin-top negatiu
+      //    (en PÍXELS, no en unitats SVG) — funciona de manera fiable.
       const svg = ptContainer.querySelector("svg");
       if (svg) {
         svg.style.background = "transparent";
@@ -3591,40 +3594,18 @@
           }
         });
 
-        // Retall del buit superior via viewBox.
-        // IMPORTANT: escaneja NOMÉS elements-fulla (text, path, line), no <g>.
-        // Els <g> agrupadors solen començar a Y=0 (cobreixen tota la pàgina),
-        // i incloïen-los feia minY = 0 sempre → cap retall. També excloem
-        // descendents de <defs> perquè no es renderitzen.
-        try {
-          let minY = Infinity;
-          const elements = svg.querySelectorAll("text, path, line");
-          elements.forEach(el => {
-            if (!el.getBBox) return;
-            if (el.closest("defs")) return;
-            try {
-              const bb = el.getBBox();
-              if (bb && bb.width > 0 && bb.height > 0 && bb.y < minY) minY = bb.y;
-            } catch (e) { /* getBBox pot fallar en elements no renderitzats */ }
-          });
-          // Detecció reeixida si hi ha un buit mesurable (>5 unitats)
-          const autoCrop = (isFinite(minY) && minY > 5) ? (minY - 4) : 0;
-          const cropY = Math.max(0, autoCrop) + (ptCfg.crop || 0);
-          if (cropY > 0) {
-            const vb = svg.getAttribute("viewBox");
-            if (vb) {
-              const parts = vb.split(/\s+/).map(parseFloat);
-              if (parts.length === 4) {
-                const [vx, vy, vw, vh] = parts;
-                svg.setAttribute("viewBox", vx + " " + (vy + cropY) + " " + vw + " " + (vh - cropY));
-                const currentH = parseFloat(svg.getAttribute("height") || vh);
-                if (currentH > 0) {
-                  svg.setAttribute("height", currentH - cropY);
-                }
-              }
-            }
-          }
-        } catch (e) { /* bbox no disponible */ }
+        // Retall amb CSS: clip-path talla el top + margin-top negatiu omple el buit.
+        // `ptCfg.crop` s'interpreta ara com a PÍXELS CSS, directes i visibles.
+        const cropPx = Math.max(0, ptCfg.crop || 0);
+        if (cropPx > 0) {
+          svg.style.clipPath = "inset(" + cropPx + "px 0 0 0)";
+          svg.style.webkitClipPath = "inset(" + cropPx + "px 0 0 0)";
+          svg.style.marginTop = "-" + cropPx + "px";
+        } else {
+          svg.style.clipPath = "";
+          svg.style.webkitClipPath = "";
+          svg.style.marginTop = "";
+        }
       }
 
       const info = [
