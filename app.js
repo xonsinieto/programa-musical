@@ -3462,9 +3462,9 @@
   let ptTrackIdx = 0;
   let ptPressedInCurrent = new Set();
 
-  // Parser MusicXML → events: [{measure, staff, notes: [{step, octave, alter, semitone, pitch}...]}]
-  // Notes de cada event ordenades de dalt (més aguda) cap avall, per facilitar
-  // el sistema "toca de dalt cap a baix" dels acords.
+  // Parser MusicXML → events ordenats per (measure, time, voice).
+  // Inclou TOTES les veus (voice 1 melodia + voice 2 acompanyament + ...).
+  // Ús de <backup>/<forward> per calcular el temps dins el compàs correctament.
   function ptParseEvents(xmlText) {
     const doc = new DOMParser().parseFromString(xmlText, "text/xml");
     const events = [];
@@ -3473,43 +3473,72 @@
 
     Array.from(part.querySelectorAll("measure")).forEach((mEl, mIdx) => {
       const measureNum = parseInt(mEl.getAttribute("number"), 10) || (mIdx + 1);
-      let lastEvent = null;
+      let currentTime = 0; // en divisions
+      let lastEvent = null; // per acord continuation
 
       Array.from(mEl.children).forEach(el => {
+        if (el.tagName === "backup") {
+          const dur = parseInt(el.querySelector("duration")?.textContent || "0", 10);
+          currentTime -= dur;
+          lastEvent = null;
+          return;
+        }
+        if (el.tagName === "forward") {
+          const dur = parseInt(el.querySelector("duration")?.textContent || "0", 10);
+          currentTime += dur;
+          lastEvent = null;
+          return;
+        }
         if (el.tagName !== "note") return;
-        // Només voice 1 (melodia principal) per començar.
+
         const voiceEl = el.querySelector(":scope > voice");
         const voice = voiceEl ? parseInt(voiceEl.textContent, 10) : 1;
-        if (voice !== 1) return;
-
         const isChord = !!el.querySelector(":scope > chord");
         const isRest = !!el.querySelector(":scope > rest");
-        if (isRest) { lastEvent = null; return; }
+        const durEl = el.querySelector(":scope > duration");
+        const dur = durEl ? parseInt(durEl.textContent, 10) : 0;
+        const staffEl = el.querySelector(":scope > staff");
+        const staff = staffEl ? parseInt(staffEl.textContent, 10) : 1;
+
+        const noteTime = isChord ? (lastEvent ? lastEvent.time : currentTime) : currentTime;
+
+        if (isRest) {
+          if (!isChord) currentTime += dur;
+          lastEvent = null;
+          return;
+        }
 
         const pitchEl = el.querySelector(":scope > pitch");
-        if (!pitchEl) return;
+        if (!pitchEl) {
+          if (!isChord) currentTime += dur;
+          return;
+        }
 
         const step = pitchEl.querySelector("step")?.textContent || "C";
         const octave = parseInt(pitchEl.querySelector("octave")?.textContent || "4", 10);
         const alterEl = pitchEl.querySelector("alter");
         const alter = alterEl ? parseInt(alterEl.textContent, 10) : 0;
-        const staffEl = el.querySelector(":scope > staff");
-        const staff = staffEl ? parseInt(staffEl.textContent, 10) : 1;
-
         const semiBase = PT_STEP_TO_SEMITONE[PT_STEP_NAME[step] || 0];
         const semitone = ((semiBase + alter) % 12 + 12) % 12;
         const pitch = octave * 12 + semiBase + alter;
-
         const note = { step, octave, alter, semitone, pitch };
 
-        if (isChord && lastEvent && lastEvent.staff === staff) {
+        if (isChord && lastEvent && lastEvent.staff === staff && lastEvent.voice === voice) {
           lastEvent.notes.push(note);
-          lastEvent.notes.sort((a, b) => b.pitch - a.pitch); // top-down
+          lastEvent.notes.sort((a, b) => b.pitch - a.pitch);
         } else {
-          lastEvent = { measure: measureNum, staff, notes: [note] };
+          lastEvent = { measure: measureNum, staff, voice, time: noteTime, notes: [note] };
           events.push(lastEvent);
         }
+        if (!isChord) currentTime += dur;
       });
+    });
+
+    // Ordena per (measure, time, voice). Al mateix time, voice 1 primer (melodia).
+    events.sort((a, b) => {
+      if (a.measure !== b.measure) return a.measure - b.measure;
+      if (a.time !== b.time) return a.time - b.time;
+      return a.voice - b.voice;
     });
     return events;
   }
@@ -3833,38 +3862,26 @@
 
   const PT_BLUE = "#1E90FF";
   const PT_RED  = "#E74C3C";
+  // Set d'índexs de ptTrack que l'usuari ha fallat (es mantenen vermells).
+  let ptFailedTrackIdxs = new Set();
+  // Noms curts en català per les etiquetes de fallada (no volem "DO5" al damunt,
+  // només "Do" amb accidental si cal)
+  const PT_CA_NAMES_SHORT = { C: "Do", D: "Re", E: "Mi", F: "Fa", G: "Sol", A: "La", B: "Si" };
 
-  // Etiquetem només les notes de VOICE 1 al DOM. OSMD barreja voice 1 i voice 2
-  // dins d'una mateixa staffline (p.ex., Poem Without Words té una whole note
-  // voice 1 + 7 eighth notes voice 2 per compàs). Comptem quantes notes voice 1
-  // hi ha per compàs (des del parser) i només etiquetem aquestes primeres N.
+  // Etiquetem TOTES les notes del DOM (voice 1 + voice 2). ptTrack ara també
+  // inclou totes les veus ordenades per (measure, time, voice), així que els
+  // índexs s'alineen amb l'ordre DOM.
   function ptLabelSVGNotes() {
     if (!ptContainer) return;
     const stafflines = ptContainer.querySelectorAll("svg g.staffline");
     if (stafflines.length === 0) return;
-    // Comptatge de notes voice 1 per (staff, measure)
-    // ptTrackAll té tots els events voice 1 de totes dues staves.
-    const countByStaffMeasure = { 1: {}, 2: {} };
-    ptTrackAll.forEach(ev => {
-      if (!countByStaffMeasure[ev.staff]) countByStaffMeasure[ev.staff] = {};
-      if (!countByStaffMeasure[ev.staff][ev.measure]) countByStaffMeasure[ev.staff][ev.measure] = 0;
-      countByStaffMeasure[ev.staff][ev.measure]++;
-    });
-    // Una staffline cada 2 és treble (Sol). Les parelles són [treble, bass].
     let iSol = 0, iFa = 0;
     stafflines.forEach((sl, slIdx) => {
       const isTreble = (slIdx % 2 === 0);
-      const xmlStaff = isTreble ? 1 : 2;
       const attr = isTreble ? "data-pt-sol" : "data-pt-fa";
-      sl.querySelectorAll("g.vf-measure").forEach(m => {
-        const measureNum = parseInt(m.id, 10);
-        const want = (countByStaffMeasure[xmlStaff] && countByStaffMeasure[xmlStaff][measureNum]) || 0;
-        const noteEls = m.querySelectorAll("g.vf-stavenote");
-        // Etiquetem les primeres `want` notes (assumim voice 1 és la primera).
-        const n = Math.min(want, noteEls.length);
-        for (let k = 0; k < n; k++) {
-          noteEls[k].setAttribute(attr, isTreble ? iSol++ : iFa++);
-        }
+      const notes = sl.querySelectorAll("g.vf-stavenote");
+      notes.forEach(noteEl => {
+        noteEl.setAttribute(attr, isTreble ? iSol++ : iFa++);
       });
     });
   }
@@ -3873,38 +3890,80 @@
     if (!ptContainer) return;
     ptContainer.querySelectorAll("[data-pt-sol], [data-pt-fa]").forEach(g => {
       g.classList.remove("pt-note-current");
+      g.classList.remove("pt-note-failed");
       g.querySelectorAll("path, ellipse").forEach(el => {
         if (el.dataset.ptOrigFill !== undefined) {
           el.setAttribute("fill", el.dataset.ptOrigFill);
         }
       });
     });
+    // Treu totes les etiquetes de noms de nota fallada
+    ptContainer.querySelectorAll(".pt-fail-label").forEach(t => t.remove());
+    ptFailedTrackIdxs.clear();
   }
 
-  function ptHighlightCurrentNote(color) {
-    if (!ptContainer) return;
-    // Primer, desressaltem la que estava en blau (si n'hi ha)
-    ptContainer.querySelectorAll(".pt-note-current").forEach(g => {
-      g.classList.remove("pt-note-current");
-      g.querySelectorAll("path, ellipse").forEach(el => {
-        if (el.dataset.ptOrigFill !== undefined) {
-          el.setAttribute("fill", el.dataset.ptOrigFill);
-        }
-      });
-    });
-    // Ara busquem l'element de la nota actual segons ptActiveStaff + ptTrackIdx
+  // Marca la nota actual com a fallada PERMANENT: fill vermell + text amb el
+  // nom de la nota a sobre. No es treu quan avançes (a diferència del blau).
+  function ptMarkCurrentAsFailed(correctName) {
     const attr = ptActiveStaff === 0 ? "data-pt-sol" : "data-pt-fa";
     const target = ptContainer.querySelector("[" + attr + "=\"" + ptTrackIdx + "\"]");
     if (!target) return;
-    target.classList.add("pt-note-current");
-    // Pintem totes les paths/ellipses dins el <g> de la nota de color
+    target.classList.add("pt-note-failed");
     target.querySelectorAll("path, ellipse").forEach(el => {
       if (el.dataset.ptOrigFill === undefined) {
         el.dataset.ptOrigFill = el.getAttribute("fill") || "#000000";
       }
-      el.setAttribute("fill", color);
+      el.setAttribute("fill", PT_RED);
     });
-    // Scroll per assegurar que la nota actual sigui visible
+    // Afegeix text amb el nom al damunt de la nota
+    try {
+      const bbox = target.getBBox ? target.getBBox() : null;
+      const svg = target.closest("svg");
+      if (bbox && svg) {
+        const ns = "http://www.w3.org/2000/svg";
+        const t = document.createElementNS(ns, "text");
+        t.setAttribute("x", bbox.x + bbox.width / 2);
+        t.setAttribute("y", bbox.y - 3);
+        t.setAttribute("text-anchor", "middle");
+        t.setAttribute("font-size", "7");
+        t.setAttribute("font-weight", "700");
+        t.setAttribute("fill", PT_RED);
+        t.setAttribute("font-family", "sans-serif");
+        t.setAttribute("class", "pt-fail-label");
+        t.textContent = correctName;
+        svg.appendChild(t);
+      }
+    } catch (e) {}
+    ptFailedTrackIdxs.add(ptTrackIdx);
+  }
+
+  function ptHighlightCurrentNote(color) {
+    if (!ptContainer) return;
+    // Desressaltem la que estava en blau (si n'hi ha) — PERÒ les que estan
+    // fallades (pt-note-failed) les mantenim vermelles permanentment.
+    ptContainer.querySelectorAll(".pt-note-current").forEach(g => {
+      g.classList.remove("pt-note-current");
+      if (g.classList.contains("pt-note-failed")) return; // mantenir vermell
+      g.querySelectorAll("path, ellipse").forEach(el => {
+        if (el.dataset.ptOrigFill !== undefined) {
+          el.setAttribute("fill", el.dataset.ptOrigFill);
+        }
+      });
+    });
+    // Trobem l'element de la nota actual
+    const attr = ptActiveStaff === 0 ? "data-pt-sol" : "data-pt-fa";
+    const target = ptContainer.querySelector("[" + attr + "=\"" + ptTrackIdx + "\"]");
+    if (!target) return;
+    target.classList.add("pt-note-current");
+    // Si està marcada com a fallada, no sobreescriure el vermell amb blau.
+    if (!target.classList.contains("pt-note-failed")) {
+      target.querySelectorAll("path, ellipse").forEach(el => {
+        if (el.dataset.ptOrigFill === undefined) {
+          el.dataset.ptOrigFill = el.getAttribute("fill") || "#000000";
+        }
+        el.setAttribute("fill", color);
+      });
+    }
     try { target.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
   }
 
@@ -4008,7 +4067,9 @@
       // Ja l'havia premut; ignorem sense marcar error.
       return;
     } else {
-      // Tecla errònia
+      // Tecla errònia → la nota queda marcada vermella PERMANENTMENT amb el
+      // nom de la nota correcta en petit a sobre. Així l'usuari pot repassar
+      // els errors al final.
       btn.classList.add("wrong-flash");
       playErrorSound && playErrorSound();
       shakeElement && shakeElement(ptContainer);
@@ -4017,10 +4078,13 @@
       ptFeedbackEl.textContent = "✖ Era " + correctName;
       ptFeedbackEl.className = "feedback wrong";
       setTimeout(() => btn.classList.remove("wrong-flash"), 200);
-      // Flash roig sobre la nota del pentagrama perquè l'usuari vegi on s'ha
-      // equivocat, i després torna al blau.
-      ptHighlightCurrentNote(PT_RED);
-      setTimeout(() => { if (ptPracticeOn) ptHighlightCurrentNote(PT_BLUE); }, 700);
+      // Marca permanent: vermell + nom (primera nota de l'acord, sense octava
+      // per estalviar espai al damunt del pentagrama)
+      const shortName = ev && ev.notes[0]
+        ? (PT_CA_NAMES_SHORT[ev.notes[0].step] || "?") +
+          (ev.notes[0].alter === 1 ? "♯" : ev.notes[0].alter === -1 ? "♭" : "")
+        : "?";
+      ptMarkCurrentAsFailed(shortName);
     }
   }
 
