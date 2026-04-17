@@ -3831,14 +3831,59 @@
     ptFeedbackEl.className = "feedback";
   }
 
-  // Avança el cursor visual d'OSMD per sincronitzar-lo amb el nostre índex.
-  // Si OSMD no respon, ens ho guardem — la lògica del joc funciona igual.
+  // Referències a les notes actualment pintades de blau perquè puguem restaurar-les
+  let ptLastColoredNotes = [];
+  const PT_BLUE = "#1E90FF";
+  const PT_DEFAULT_NOTE_COLOR = "#000000";
+  // PNG 1x1 transparent — per substituir la imatge del cursor d'OSMD, mantenint
+  // les dimensions del cursor però mostrant només el backgroundColor blau.
+  const PT_TRANSPARENT_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+
+  // Substitueix la imatge PNG del cursor d'OSMD per una transparent, deixant
+  // que el background-color blau del CSS sigui visible com a rectangle.
+  function ptStyleCursor() {
+    const imgs = ptContainer.querySelectorAll("img");
+    imgs.forEach(img => {
+      if (!img.dataset.ptOrigWidth) {
+        img.dataset.ptOrigWidth = img.width || img.getAttribute("width") || 20;
+        img.dataset.ptOrigHeight = img.height || img.getAttribute("height") || 40;
+      }
+      if (img.src !== PT_TRANSPARENT_PNG) img.src = PT_TRANSPARENT_PNG;
+      img.style.width = img.dataset.ptOrigWidth + "px";
+      img.style.height = img.dataset.ptOrigHeight + "px";
+    });
+  }
+
+  function ptResetNoteColors() {
+    ptLastColoredNotes.forEach(gn => {
+      try { if (gn && gn.setColor) gn.setColor(PT_DEFAULT_NOTE_COLOR, { applyToBeams: false }); } catch (e) {}
+    });
+    ptLastColoredNotes = [];
+  }
+
+  function ptColorCurrentNote() {
+    ptResetNoteColors();
+    try {
+      if (!ptOsmd || !ptOsmd.cursor) return;
+      const gnotes = ptOsmd.cursor.GNotesUnderCursor ? ptOsmd.cursor.GNotesUnderCursor() : [];
+      gnotes.forEach(gn => {
+        if (gn && gn.setColor) {
+          gn.setColor(PT_BLUE, { applyToBeams: false });
+          ptLastColoredNotes.push(gn);
+        }
+      });
+    } catch (e) { /* API pot fallar segons versió; no fatal */ }
+  }
+
+  // Avança el cursor visual d'OSMD i pinta la nova nota en blau.
   function ptAdvanceOsmdCursor() {
     try {
       if (ptOsmd && ptOsmd.cursor && !ptOsmd.cursor.iterator.EndReached) {
         ptOsmd.cursor.next();
       }
     } catch (e) { /* no fatal */ }
+    ptColorCurrentNote();
+    ptStyleCursor();
   }
 
   function ptEnterPractice() {
@@ -3854,10 +3899,14 @@
     ptPracticeBtn.textContent = "⏸ Aturar";
     ptRefreshTrack();
     ptDisplayCurrent();
+    // Pinta la primera nota en blau i estilitza el cursor amb background blau
+    ptColorCurrentNote();
+    ptStyleCursor();
   }
 
   function ptExitPractice() {
     ptPracticeOn = false;
+    ptResetNoteColors();
     try { ptOsmd && ptOsmd.cursor && ptOsmd.cursor.hide(); } catch (e) {}
     ptPianoEl.classList.add("hidden");
     document.body.classList.remove("pt-practicing");

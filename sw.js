@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v52-xml-parser";
+const CACHE = "lectura-notes-v54-blue-cursor-works";
 const FILES = [
   "./",
   "./index.html",
