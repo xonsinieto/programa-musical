@@ -3539,16 +3539,15 @@
       // Zoom més baix → més compassos per línia (com al PDF original amb 5-6/línia).
       const isMobile = window.innerWidth < 600;
       ptOsmd.zoom = isMobile ? 0.48 : 0.65;
-      // Ajust vertical fi del títol i de la primera línia:
-      // - Títol al límit superior (TitleTopDistance = 0, PageTopMargin = 0)
-      // - MÉS espai entre títol i primera línia de música (TitleBottomDistance alt)
+      // Vertical balancejat: títol NO enganxat a dalt NI enganxat a la primera línia.
+      // Queda centrat dins l'espai blanc superior, com en un full impres real.
       try {
         const er = ptOsmd.EngravingRules;
         if (er) {
-          if ("TitleTopDistance" in er) er.TitleTopDistance = 0;
-          if ("TitleBottomDistance" in er) er.TitleBottomDistance = 6;
-          if ("PageTopMargin" in er) er.PageTopMargin = 0;
-          if ("PageTopMarginNarrow" in er) er.PageTopMarginNarrow = 0;
+          if ("TitleTopDistance" in er) er.TitleTopDistance = 6;
+          if ("TitleBottomDistance" in er) er.TitleBottomDistance = 12;
+          if ("PageTopMargin" in er) er.PageTopMargin = 2;
+          if ("PageTopMarginNarrow" in er) er.PageTopMarginNarrow = 2;
         }
       } catch (e) { /* EngravingRules diferents segons versió d'OSMD */ }
       ptOsmd.render();

@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v37-title-breath";
+const CACHE = "lectura-notes-v38-title-centered";
 const FILES = [
   "./",
   "./index.html",

@@ -2537,11 +2537,15 @@ main {
 .pt-info {
   text-align: center;
   font-family: var(--font-mono);
-  font-size: 0.78rem;
-  color: rgba(232, 236, 241, 0.7);
+  font-size: 0.72rem;
+  color: rgba(232, 236, 241, 0.65);
   letter-spacing: 0.06em;
-  padding: 2px 12px;
-  margin: 0 auto 2px;
+  padding: 0;
+  margin: -4px auto 2px;
+}
+/* A Partitures els controls són compactes per guanyar espai vertical */
+#screen-partitures .controls {
+  margin-bottom: 4px;
 }
 @media (max-width: 600px) {
   #pt-staff-container {
