@@ -2508,7 +2508,7 @@ main {
   width: 100%;
   max-width: 1500px;
   margin: 0 auto 20px;
-  padding: 16px 12px;
+  padding: 32px 40px;
   background:
     radial-gradient(ellipse at center, transparent 60%, rgba(90, 70, 40, 0.08) 100%),
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.3 0 0 0 0 0.24 0 0 0 0.12 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"),
@@ -2527,6 +2527,12 @@ main {
 #pt-staff-container svg {
   display: block;
   margin: 0 auto;
+  background: transparent !important;
+  max-width: 100%;
+}
+/* Evita que OSMD dibuixi cap rectangle de fons a dins del paper */
+#pt-staff-container svg > rect:first-child {
+  fill: transparent !important;
 }
 .pt-info {
   text-align: center;
@@ -2539,7 +2545,7 @@ main {
 }
 @media (max-width: 600px) {
   #pt-staff-container {
-    padding: 8px 4px;
+    padding: 14px 12px;
     margin: 0 1px 10px;
     border-radius: 10px;
     min-height: 280px;

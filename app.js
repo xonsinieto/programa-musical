@@ -3530,16 +3530,36 @@
         drawPartNames: false,
         autoResize: true,
         pageFormat: "Endless", // tota la partitura seguida, scroll vertical
-        pageBackgroundColor: "#F6EFE0",
-        drawingParameters: "compact" // compacte: més compassos per línia, com al PDF original
+        // No passem pageBackgroundColor — així OSMD no pinta un "segon full" a sota
+        // i es veu el paper cream del contenidor com un de sol.
+        drawingParameters: "compact"
       });
 
       await ptOsmd.load(xmlText);
-      // Ajusta zoom per obtenir 5-6 compassos per sistema (com al PDF de MuseScore).
-      // Al mòbil reduïm més perquè l'amplada és escassa.
+      // Zoom més baix → més compassos per línia (com al PDF original amb 5-6/línia).
       const isMobile = window.innerWidth < 600;
-      ptOsmd.zoom = isMobile ? 0.55 : 0.75;
+      ptOsmd.zoom = isMobile ? 0.48 : 0.65;
       ptOsmd.render();
+
+      // Post-processat: elimina qualsevol rectangle de fons que OSMD hagi pintat
+      // (això és el que causava el "dos papers" que veu l'usuari). Deixem
+      // transparent perquè es vegi només el paper cream del contenidor.
+      const svg = ptContainer.querySelector("svg");
+      if (svg) {
+        svg.style.background = "transparent";
+        // Els primers <rect> sense class, amb fill diferent de 'none', són normalment
+        // la pàgina de fons. Els fem transparents.
+        Array.from(svg.querySelectorAll("rect")).forEach(r => {
+          const w = parseFloat(r.getAttribute("width") || "0");
+          const h = parseFloat(r.getAttribute("height") || "0");
+          const fill = r.getAttribute("fill");
+          // Els rectangles grans (amples > 400) sense classe són el fons de pàgina
+          if (w > 400 && h > 400 && fill && fill !== "none") {
+            r.setAttribute("fill", "transparent");
+            r.setAttribute("stroke", "none");
+          }
+        });
+      }
 
       const info = [
         item.name,
