@@ -2716,6 +2716,16 @@ body.pt-practicing #screen-partitures { padding-bottom: 170px; }
   transform: translateY(1px);
 }
 
+/* Hint: tecla que cal prémer per la nota actual (pulse glow blau) */
+.pt-key.pt-key-hint {
+  box-shadow: 0 0 0 3px rgba(30, 144, 255, 0.8), 0 0 20px rgba(30, 144, 255, 0.6) !important;
+  animation: ptKeyHintPulse 1.2s ease-in-out infinite;
+}
+@keyframes ptKeyHintPulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(30, 144, 255, 0.7), 0 0 15px rgba(30, 144, 255, 0.5); }
+  50%      { box-shadow: 0 0 0 4px rgba(30, 144, 255, 1), 0 0 28px rgba(30, 144, 255, 0.9); }
+}
+
 /* Flash d'encert / errada */
 .pt-key.correct-flash {
   background: linear-gradient(#00FF94, #00C06F) !important;

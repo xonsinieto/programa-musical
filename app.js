@@ -3856,11 +3856,30 @@
     if (!ev) {
       ptFeedbackEl.textContent = "🎉 Fi de la partitura";
       ptFeedbackEl.className = "feedback correct";
+      ptHighlightExpectedKeys();
       return;
     }
     const name = ptFormatEventName(ev);
     ptFeedbackEl.textContent = "Toca: " + name + "  (compàs " + ev.measure + ")";
     ptFeedbackEl.className = "feedback";
+    ptHighlightExpectedKeys();
+  }
+
+  // Ressalta les tecles del piano que corresponen a l'acord actual perquè
+  // l'usuari sàpiga quines premer (especialment útil per bemolls/sostinguts —
+  // si la nota és Lab4, es ressalta la tecla 'Sol♯/La♭', no la 'La').
+  function ptHighlightExpectedKeys() {
+    document.querySelectorAll(".pt-key.pt-key-hint").forEach(k => {
+      k.classList.remove("pt-key-hint");
+    });
+    const ev = ptCurrentEvent();
+    if (!ev) return;
+    ev.notes.forEach(n => {
+      // Salta les que l'usuari ja ha premut en aquest acord
+      if (ptPressedInCurrent.has(n.semitone)) return;
+      const key = document.querySelector(".pt-key[data-st=\"" + n.semitone + "\"]");
+      if (key) key.classList.add("pt-key-hint");
+    });
   }
 
   const PT_BLUE = "#1E90FF";
@@ -4017,6 +4036,8 @@
     ptPracticeBtn.textContent = "▶ Practicar";
     ptFeedbackEl.textContent = "";
     ptPressedInCurrent = new Set();
+    // Neteja hints del teclat
+    document.querySelectorAll(".pt-key.pt-key-hint").forEach(k => k.classList.remove("pt-key-hint"));
   }
 
   function ptSetClef(staffIdx) {
@@ -4071,15 +4092,17 @@
           playCongratulations && playCongratulations();
           spawnConfetti && spawnConfetti({ count: 120 });
           ptResetAllSVGNoteColors();
+          document.querySelectorAll(".pt-key.pt-key-hint").forEach(k => k.classList.remove("pt-key-hint"));
         } else {
           ptDisplayCurrent();
           ptHighlightCurrentNote(PT_BLUE);
         }
       } else {
-        // Falten notes per completar l'acord
+        // Falten notes per completar l'acord — actualitza el hint
         const stillNeeded = Array.from(expected).filter(s => !ptPressedInCurrent.has(s));
         ptFeedbackEl.textContent = "✔ Falta: " + stillNeeded.map(ptSemitoneToName).join(" + ");
         ptFeedbackEl.className = "feedback correct";
+        ptHighlightExpectedKeys();
       }
     } else if (expected.has(semitone)) {
       // Ja l'havia premut; ignorem sense marcar error.
