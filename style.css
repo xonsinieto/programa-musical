@@ -2547,6 +2547,77 @@ main {
 #screen-partitures .controls {
   margin-bottom: 4px;
 }
+
+/* Panell d'ajust — permet a l'usuari afinar espai/títol en temps real */
+.pt-adjust-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 640px;
+  margin: 4px auto 10px;
+  padding: 14px 18px;
+  background: rgba(18, 22, 45, 0.8);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: var(--ink);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.pt-adjust-panel.hidden { display: none; }
+.pt-adjust-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: rgba(232, 236, 241, 0.8);
+  text-transform: uppercase;
+}
+.pt-adjust-row strong {
+  color: var(--primary);
+  font-size: 0.9rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.pt-adjust-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--primary);
+  height: 20px;
+}
+.pt-adjust-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+  justify-content: flex-end;
+}
+.pt-adjust-actions button {
+  padding: 8px 14px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: rgba(5, 7, 15, 0.6);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 180ms ease;
+}
+.pt-adjust-actions button:hover {
+  border-color: var(--primary);
+  background: rgba(0, 240, 255, 0.08);
+}
+#pt-adjust-btn {
+  font-size: 0.65rem;
+}
+@media (max-width: 600px) {
+  .pt-adjust-panel {
+    padding: 10px 12px;
+    margin: 4px 3px 8px;
+  }
+  .pt-adjust-row label { font-size: 0.65rem; }
+  .pt-adjust-row strong { font-size: 0.8rem; }
+}
 @media (max-width: 600px) {
   #pt-staff-container {
     padding: 6px 12px 12px;

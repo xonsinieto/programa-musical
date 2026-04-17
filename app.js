@@ -3442,6 +3442,26 @@
   const ptSelect       = document.getElementById("pt-select");
   const ptInfoEl       = document.getElementById("pt-info");
   const ptContainer    = document.getElementById("pt-staff-container");
+  const ptAdjustBtn    = document.getElementById("pt-adjust-btn");
+  const ptAdjustPanel  = document.getElementById("pt-adjust-panel");
+  const ptCopyBtn      = document.getElementById("pt-copy-btn");
+  const ptResetBtn     = document.getElementById("pt-reset-btn");
+  const PT_CFG_KEY     = "ptSpaceConfig_v1";
+  const PT_DEFAULTS    = { padding: 0, ttop: 1, tbot: 14, crop: 0, zoom: 0.65 };
+
+  function ptLoadConfig() {
+    try {
+      const raw = localStorage.getItem(PT_CFG_KEY);
+      if (!raw) return { ...PT_DEFAULTS };
+      const parsed = JSON.parse(raw);
+      return { ...PT_DEFAULTS, ...parsed };
+    } catch (e) { return { ...PT_DEFAULTS }; }
+  }
+  function ptSaveConfig(cfg) {
+    try { localStorage.setItem(PT_CFG_KEY, JSON.stringify(cfg)); } catch (e) {}
+  }
+  let ptCfg = ptLoadConfig();
+
   let ptOsmd = null;
   let ptCatalog = null; // llista de partitures (del index.json)
   let ptInitialized = false;
@@ -3536,15 +3556,16 @@
       });
 
       await ptOsmd.load(xmlText);
-      // Zoom més baix → més compassos per línia (com al PDF original amb 5-6/línia).
+      // Valors del ptCfg (editables pel user via panel) — amb fallback per mòbil
       const isMobile = window.innerWidth < 600;
-      ptOsmd.zoom = isMobile ? 0.48 : 0.65;
-      // Títol amb respir sota (ample) i a prop del marge superior del paper
+      ptOsmd.zoom = isMobile ? 0.48 : ptCfg.zoom;
+      // Aplica padding del contenidor
+      ptContainer.style.paddingTop = ptCfg.padding + "px";
       try {
         const er = ptOsmd.EngravingRules;
         if (er) {
-          if ("TitleTopDistance" in er) er.TitleTopDistance = 1;
-          if ("TitleBottomDistance" in er) er.TitleBottomDistance = 14;
+          if ("TitleTopDistance" in er) er.TitleTopDistance = ptCfg.ttop;
+          if ("TitleBottomDistance" in er) er.TitleBottomDistance = ptCfg.tbot;
           if ("PageTopMargin" in er) er.PageTopMargin = 0;
           if ("PageTopMarginNarrow" in er) er.PageTopMarginNarrow = 0;
         }
@@ -3589,7 +3610,8 @@
               const parts = vb.split(/\s+/).map(parseFloat);
               if (parts.length === 4) {
                 const [vx, vy, vw, vh] = parts;
-                const cropY = Math.max(0, minY - 8); // deixa 8 unitats de respir al damunt
+                // cropY = espai automàtic detectat + retall extra de l'usuari
+                const cropY = Math.max(0, minY - 8) + ptCfg.crop;
                 svg.setAttribute("viewBox", vx + " " + (vy + cropY) + " " + vw + " " + (vh - cropY));
                 // Ajusta també l'alçada intrínseca perquè no es distorsioni
                 const currentH = parseFloat(svg.getAttribute("height") || vh);
@@ -3618,6 +3640,84 @@
     }
   }
 
+  // --- Panell d'ajust d'espai (sliders live amb debounce) ---
+  let ptAdjustDebounce = null;
+  function ptBindAdjustPanel() {
+    if (!ptAdjustBtn || ptAdjustBtn.dataset.bound === "1") return;
+    ptAdjustBtn.dataset.bound = "1";
+
+    // Mostra/amaga panel
+    ptAdjustBtn.addEventListener("click", () => {
+      ptAdjustPanel.classList.toggle("hidden");
+    });
+
+    // Sliders + labels
+    const sliders = [
+      { id: "padding", sel: "pt-s-padding", lbl: "pt-v-padding", fmt: v => String(Math.round(v)) },
+      { id: "ttop",    sel: "pt-s-ttop",    lbl: "pt-v-ttop",    fmt: v => String(Math.round(v)) },
+      { id: "tbot",    sel: "pt-s-tbot",    lbl: "pt-v-tbot",    fmt: v => String(Math.round(v)) },
+      { id: "crop",    sel: "pt-s-crop",    lbl: "pt-v-crop",    fmt: v => String(Math.round(v)) },
+      { id: "zoom",    sel: "pt-s-zoom",    lbl: "pt-v-zoom",    fmt: v => parseFloat(v).toFixed(2) }
+    ];
+
+    function syncSliderUI() {
+      sliders.forEach(s => {
+        const sl = document.getElementById(s.sel);
+        const lbl = document.getElementById(s.lbl);
+        if (sl) sl.value = ptCfg[s.id];
+        if (lbl) lbl.textContent = s.fmt(ptCfg[s.id]);
+      });
+    }
+    syncSliderUI();
+
+    sliders.forEach(s => {
+      const sl = document.getElementById(s.sel);
+      const lbl = document.getElementById(s.lbl);
+      if (!sl) return;
+      sl.addEventListener("input", () => {
+        const v = s.id === "zoom" ? parseFloat(sl.value) : parseFloat(sl.value);
+        ptCfg[s.id] = v;
+        if (lbl) lbl.textContent = s.fmt(v);
+        // Debounce: re-renderitzem 250ms després de l'últim canvi (renderitzar
+        // 99 compassos pot trigar ~1s; evitem fer-ho 100 vegades al moure el slider)
+        clearTimeout(ptAdjustDebounce);
+        ptAdjustDebounce = setTimeout(() => {
+          ptSaveConfig(ptCfg);
+          const id = ptSelect.value;
+          const item = (ptCatalog || []).find(p => p.id === id);
+          if (item) ptRenderPartitura(item);
+        }, 250);
+      });
+    });
+
+    // Copiar valors al porta-retalls perquè l'usuari els pugui enviar
+    if (ptCopyBtn) {
+      ptCopyBtn.addEventListener("click", async () => {
+        const txt = "padding: " + ptCfg.padding + "px · ttop: " + ptCfg.ttop +
+                    " · tbot: " + ptCfg.tbot + " · crop: " + ptCfg.crop +
+                    " · zoom: " + ptCfg.zoom.toFixed(2);
+        try {
+          await navigator.clipboard.writeText(txt);
+          showToast("Valors copiats: " + txt, "success");
+        } catch (e) {
+          prompt("Valors (copia'ls):", txt);
+        }
+      });
+    }
+
+    // Reset als defaults
+    if (ptResetBtn) {
+      ptResetBtn.addEventListener("click", () => {
+        ptCfg = { ...PT_DEFAULTS };
+        ptSaveConfig(ptCfg);
+        syncSliderUI();
+        const id = ptSelect.value;
+        const item = (ptCatalog || []).find(p => p.id === id);
+        if (item) ptRenderPartitura(item);
+      });
+    }
+  }
+
   async function ptEnterScreen() {
     if (!ptInitialized) {
       ptInitialized = true;
@@ -3628,6 +3728,7 @@
         const item = (ptCatalog || []).find(p => p.id === id);
         if (item) ptRenderPartitura(item);
       });
+      ptBindAdjustPanel();
     }
     const catalog = ptCatalog || [];
     if (!catalog.length) {
