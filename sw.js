@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v44-calibrated";
+const CACHE = "lectura-notes-v45-hide-adjust";
 const FILES = [
   "./",
   "./index.html",
