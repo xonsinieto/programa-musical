@@ -3446,6 +3446,15 @@
   const ptAdjustPanel  = document.getElementById("pt-adjust-panel");
   const ptCopyBtn      = document.getElementById("pt-copy-btn");
   const ptResetBtn     = document.getElementById("pt-reset-btn");
+  const ptPracticeBtn  = document.getElementById("pt-practice-btn");
+  const ptReadToolbar  = document.getElementById("pt-read-toolbar");
+  const ptReadCurrentEl = document.getElementById("pt-read-current");
+  const ptNavPrev      = document.getElementById("pt-nav-prev");
+  const ptNavNext      = document.getElementById("pt-nav-next");
+  const ptExitBtn      = document.getElementById("pt-exit-btn");
+  const ptClefBtns     = document.querySelectorAll(".pt-clef-btn");
+  let ptPracticeOn = false;
+  let ptActiveStaff = 0; // 0 = Sol (treble), 1 = Fa (bass)
   const PT_CFG_KEY     = "ptSpaceConfig_v1";
   // Valors per defecte calibrats per l'usuari amb el panell d'ajust (17/04/2026):
   // - padding 4: mica de respir sota el contenidor, amb el paper ja tocat a dalt
@@ -3710,17 +3719,155 @@
     }
   }
 
+  // --- MODE LECTURA (practicar amb cursor d'OSMD) ---
+  // Mapeig català per mostrar els noms ("do/re/mi/fa/sol/la/si") a partir de la
+  // "FundamentalNote" d'OSMD (0=C, 1=D, 2=E, 3=F, 4=G, 5=A, 6=B).
+  const PT_CA_NAMES = ["DO", "RE", "MI", "FA", "SOL", "LA", "SI"];
+
+  function ptCursorNotes() {
+    if (!ptOsmd || !ptOsmd.cursor) return [];
+    try { return ptOsmd.cursor.NotesUnderCursor() || []; }
+    catch (e) { return []; }
+  }
+
+  // Índex de staff d'una nota: 0 = clau superior (Sol), 1 = inferior (Fa)
+  function ptNoteStaffIndex(n) {
+    try {
+      // Versions modernes d'OSMD
+      const s = n.sourceStaffEntry && n.sourceStaffEntry.parentStaff;
+      if (s && typeof s.idInMusicSheet === "number") return s.idInMusicSheet;
+    } catch (e) {}
+    try {
+      const s2 = n.ParentVoiceEntry && n.ParentVoiceEntry.ParentSourceStaffEntry
+                 && n.ParentVoiceEntry.ParentSourceStaffEntry.ParentStaff;
+      if (s2 && typeof s2.IdInMusicSheet === "number") return s2.IdInMusicSheet;
+    } catch (e) {}
+    return 0;
+  }
+
+  function ptIsRestNote(n) {
+    try { return n.isRest ? n.isRest() : (n.isRest === true); }
+    catch (e) { return false; }
+  }
+
+  function ptActiveNotesAtCursor() {
+    const all = ptCursorNotes();
+    return all.filter(n => ptNoteStaffIndex(n) === ptActiveStaff && !ptIsRestNote(n));
+  }
+
+  // Format d'una nota: "RE♭4", "SOL5", etc.
+  function ptFormatNoteName(n) {
+    try {
+      const p = n.Pitch || n.pitch;
+      if (!p) return "?";
+      const step = (typeof p.FundamentalNote === "number") ? p.FundamentalNote : p.fundamentalNote;
+      const oct = (typeof p.Octave === "number") ? p.Octave : p.octave;
+      const alt = (typeof p.Accidental === "number") ? p.Accidental : (p.accidental || 0);
+      let name = PT_CA_NAMES[step] || "?";
+      if (alt === 1) name += "♯";
+      else if (alt === -1) name += "♭";
+      else if (alt === 2) name += "𝄪";
+      else if (alt === -2) name += "𝄫";
+      return name + oct;
+    } catch (e) { return "?"; }
+  }
+
+  function ptUpdateReadDisplay() {
+    const notes = ptActiveNotesAtCursor();
+    if (!notes.length) {
+      ptReadCurrentEl.textContent = "Toca: —";
+      return;
+    }
+    const names = notes.map(ptFormatNoteName);
+    ptReadCurrentEl.textContent = "Toca: " + names.join(" + ");
+  }
+
+  // Avança fins a una posició que tingui notes a la clau activa (salta silencis
+  // i posicions sense notes per la clau que practiques). Safety: 500 passos.
+  function ptSkipToActive() {
+    if (!ptOsmd || !ptOsmd.cursor) return;
+    let steps = 0;
+    while (steps++ < 500 && !ptOsmd.cursor.iterator.EndReached) {
+      const active = ptActiveNotesAtCursor();
+      if (active.length > 0) return;
+      ptOsmd.cursor.next();
+    }
+  }
+
+  function ptEnterPractice() {
+    if (!ptOsmd) return;
+    ptPracticeOn = true;
+    try {
+      ptOsmd.cursor.show();
+      ptOsmd.cursor.reset();
+    } catch (e) {}
+    ptReadToolbar.classList.remove("hidden");
+    ptPracticeBtn.classList.add("is-active");
+    ptSkipToActive();
+    ptUpdateReadDisplay();
+  }
+
+  function ptExitPractice() {
+    ptPracticeOn = false;
+    try { ptOsmd && ptOsmd.cursor && ptOsmd.cursor.hide(); } catch (e) {}
+    ptReadToolbar.classList.add("hidden");
+    ptPracticeBtn.classList.remove("is-active");
+  }
+
+  function ptNavNextNote() {
+    if (!ptOsmd || !ptOsmd.cursor) return;
+    ptOsmd.cursor.next();
+    ptSkipToActive();
+    ptUpdateReadDisplay();
+  }
+
+  function ptNavPrevNote() {
+    if (!ptOsmd || !ptOsmd.cursor) return;
+    try { ptOsmd.cursor.previous(); } catch (e) {}
+    // No fem skip-to-active enrere per simplicitat; l'usuari pot tornar a avançar.
+    ptUpdateReadDisplay();
+  }
+
+  function ptSetClef(staffIdx) {
+    ptActiveStaff = staffIdx;
+    ptClefBtns.forEach(b => {
+      b.classList.toggle("is-active", parseInt(b.dataset.staff, 10) === staffIdx);
+    });
+    if (ptPracticeOn) {
+      ptSkipToActive();
+      ptUpdateReadDisplay();
+    }
+  }
+
+  function ptBindReadControls() {
+    if (!ptPracticeBtn || ptPracticeBtn.dataset.bound === "1") return;
+    ptPracticeBtn.dataset.bound = "1";
+
+    ptPracticeBtn.addEventListener("click", () => {
+      if (ptPracticeOn) ptExitPractice();
+      else ptEnterPractice();
+    });
+    if (ptExitBtn) ptExitBtn.addEventListener("click", ptExitPractice);
+    if (ptNavPrev) ptNavPrev.addEventListener("click", ptNavPrevNote);
+    if (ptNavNext) ptNavNext.addEventListener("click", ptNavNextNote);
+    ptClefBtns.forEach(b => {
+      b.addEventListener("click", () => ptSetClef(parseInt(b.dataset.staff, 10)));
+    });
+  }
+
   async function ptEnterScreen() {
     if (!ptInitialized) {
       ptInitialized = true;
       const catalog = await ptLoadCatalog();
       ptPopulateSelect(catalog);
       ptSelect.addEventListener("change", () => {
+        if (ptPracticeOn) ptExitPractice(); // surto del mode lectura en canviar partitura
         const id = ptSelect.value;
         const item = (ptCatalog || []).find(p => p.id === id);
         if (item) ptRenderPartitura(item);
       });
       ptBindAdjustPanel();
+      ptBindReadControls();
     }
     const catalog = ptCatalog || [];
     if (!catalog.length) {

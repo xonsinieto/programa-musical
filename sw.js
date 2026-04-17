@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v46-children";
+const CACHE = "lectura-notes-v47-reading-mode-phase1";
 const FILES = [
   "./",
   "./index.html",

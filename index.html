@@ -501,6 +501,22 @@
           <select id="pt-select"></select>
         </label>
         <button id="pt-adjust-btn" type="button" title="Ajustar espai i mida" hidden style="display:none">⚙ Ajustar</button>
+        <button id="pt-practice-btn" type="button" title="Entrar en mode lectura">▶ Practicar</button>
+      </div>
+
+      <!-- Barra de lectura: apareix quan entres en mode practicar -->
+      <div id="pt-read-toolbar" class="pt-read-toolbar hidden">
+        <div class="pt-read-group">
+          <span class="pt-read-label">Practico:</span>
+          <button class="pt-clef-btn is-active" data-staff="0" title="Clau de Sol">Sol</button>
+          <button class="pt-clef-btn" data-staff="1" title="Clau de Fa">Fa</button>
+        </div>
+        <div class="pt-read-group">
+          <button id="pt-nav-prev" class="pt-nav-btn" title="Nota anterior">◄</button>
+          <button id="pt-nav-next" class="pt-nav-btn" title="Nota següent">►</button>
+        </div>
+        <div class="pt-read-current" id="pt-read-current">Toca: —</div>
+        <button id="pt-exit-btn" class="pt-exit-btn" title="Sortir del mode lectura">✕</button>
       </div>
 
       <!-- Panell d'ajust amb sliders. Canvis aplicats en temps real amb debounce. -->
