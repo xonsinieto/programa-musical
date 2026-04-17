@@ -3539,14 +3539,15 @@
       // Zoom més baix → més compassos per línia (com al PDF original amb 5-6/línia).
       const isMobile = window.innerWidth < 600;
       ptOsmd.zoom = isMobile ? 0.48 : 0.65;
-      // Redueix l'espai que OSMD reserva per sobre del títol i entre títol i música.
+      // Redueix a zero l'espai que OSMD reserva per sobre del títol i entre títol i música.
       try {
         const er = ptOsmd.EngravingRules;
         if (er) {
-          if ("TitleTopDistance" in er) er.TitleTopDistance = 2;
-          if ("TitleBottomDistance" in er) er.TitleBottomDistance = 2;
-          if ("PageTopMargin" in er) er.PageTopMargin = 1;
-          if ("PageTopMarginNarrow" in er) er.PageTopMarginNarrow = 1;
+          if ("TitleTopDistance" in er) er.TitleTopDistance = 0;
+          if ("TitleBottomDistance" in er) er.TitleBottomDistance = 1;
+          if ("PageTopMargin" in er) er.PageTopMargin = 0;
+          if ("PageTopMarginNarrow" in er) er.PageTopMarginNarrow = 0;
+          if ("SheetTitleHeight" in er) er.SheetTitleHeight = 4; // mida del títol; baixar-lo també puja la música
         }
       } catch (e) { /* EngravingRules diferents segons versió d'OSMD */ }
       ptOsmd.render();
