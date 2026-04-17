@@ -550,15 +550,27 @@
       <div id="pt-info" class="pt-info"></div>
       <div id="pt-staff-container"></div>
 
-      <!-- Botons de resposta: apareixen només en mode practicar -->
-      <div id="pt-answer-buttons" class="answer-buttons pt-answer-buttons hidden">
-        <button class="note-btn pt-note-btn" data-note="do">Do</button>
-        <button class="note-btn pt-note-btn" data-note="re">Re</button>
-        <button class="note-btn pt-note-btn" data-note="mi">Mi</button>
-        <button class="note-btn pt-note-btn" data-note="fa">Fa</button>
-        <button class="note-btn pt-note-btn" data-note="sol">Sol</button>
-        <button class="note-btn pt-note-btn" data-note="la">La</button>
-        <button class="note-btn pt-note-btn" data-note="si">Si</button>
+      <!-- Teclat piano (12 tecles) fix a baix de la pantalla en mode practicar -->
+      <div id="pt-piano" class="pt-piano hidden">
+        <div class="pt-piano-row pt-piano-accidentals">
+          <span class="pt-spacer pt-spacer-half"></span>
+          <button class="pt-key pt-key-acc" data-st="1" title="Do♯ / Re♭">Do♯<small>Re♭</small></button>
+          <button class="pt-key pt-key-acc" data-st="3" title="Re♯ / Mi♭">Re♯<small>Mi♭</small></button>
+          <span class="pt-spacer pt-spacer-full"></span>
+          <button class="pt-key pt-key-acc" data-st="6" title="Fa♯ / Sol♭">Fa♯<small>Sol♭</small></button>
+          <button class="pt-key pt-key-acc" data-st="8" title="Sol♯ / La♭">Sol♯<small>La♭</small></button>
+          <button class="pt-key pt-key-acc" data-st="10" title="La♯ / Si♭">La♯<small>Si♭</small></button>
+          <span class="pt-spacer pt-spacer-half"></span>
+        </div>
+        <div class="pt-piano-row pt-piano-naturals">
+          <button class="pt-key pt-key-nat" data-st="0">Do</button>
+          <button class="pt-key pt-key-nat" data-st="2">Re</button>
+          <button class="pt-key pt-key-nat" data-st="4">Mi</button>
+          <button class="pt-key pt-key-nat" data-st="5">Fa</button>
+          <button class="pt-key pt-key-nat" data-st="7">Sol</button>
+          <button class="pt-key pt-key-nat" data-st="9">La</button>
+          <button class="pt-key pt-key-nat" data-st="11">Si</button>
+        </div>
       </div>
     </section>
   </main>

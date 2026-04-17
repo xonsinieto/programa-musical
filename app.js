@@ -3447,12 +3447,16 @@
   const ptCopyBtn      = document.getElementById("pt-copy-btn");
   const ptResetBtn     = document.getElementById("pt-reset-btn");
   const ptPracticeBtn  = document.getElementById("pt-practice-btn");
-  const ptAnswerWrap   = document.getElementById("pt-answer-buttons");
+  const ptPianoEl      = document.getElementById("pt-piano");
   const ptFeedbackEl   = document.getElementById("pt-feedback");
   const ptClefBtns     = document.querySelectorAll(".pt-clef-btn");
-  const ptNoteBtns     = document.querySelectorAll(".pt-note-btn");
+  const ptPianoKeys    = document.querySelectorAll(".pt-key");
   let ptPracticeOn = false;
   let ptActiveStaff = 0; // 0 = Sol (treble), 1 = Fa (bass)
+  // Set de semitons que falten per prémer en el "temps" actual de la partitura
+  let ptExpectedSet = null; // Set<number> o null si no actiu
+  // Base MIDI semitone per cada lletra (C=0, D=2, E=4, F=5, G=7, A=9, B=11)
+  const PT_STEP_TO_SEMITONE = [0, 2, 4, 5, 7, 9, 11];
   const PT_CFG_KEY     = "ptSpaceConfig_v1";
   // Valors per defecte calibrats per l'usuari amb el panell d'ajust (17/04/2026):
   // - padding 4: mica de respir sota el contenidor, amb el paper ja tocat a dalt
@@ -3781,26 +3785,29 @@
     }
   }
 
-  // Retorna el nom CATALÀ (minúscula: 'do/re/mi/fa/sol/la/si') de la nota esperada
-  // actual. Si hi ha un acord, agafem la nota SUPERIOR (la més aguda) com a objectiu
-  // principal — la majoria d'usuaris identifiquen l'acord per la melodia superior.
-  function ptExpectedCaName() {
-    const active = ptActiveNotesAtCursor();
-    if (!active.length) return null;
-    // Ordena per pitch descendent (tria la més aguda)
-    active.sort((a, b) => {
-      const pa = (a.Pitch && (a.Pitch.Octave * 7 + a.Pitch.FundamentalNote)) || 0;
-      const pb = (b.Pitch && (b.Pitch.Octave * 7 + b.Pitch.FundamentalNote)) || 0;
-      return pb - pa;
-    });
-    const top = active[0];
+  // Retorna el semitó (0-11) d'una nota OSMD. Do=0, Do♯=1, Re=2, ..., Si=11.
+  function ptNoteSemitone(n) {
     try {
-      const step = (typeof top.Pitch.FundamentalNote === "number")
-        ? top.Pitch.FundamentalNote : top.Pitch.fundamentalNote;
-      // Català MINÚSCULA perquè coincideixi amb els data-note dels botons.
-      const caMap = ["do", "re", "mi", "fa", "sol", "la", "si"];
-      return caMap[step] || null;
+      const p = n.Pitch || n.pitch;
+      if (!p) return null;
+      const step = (typeof p.FundamentalNote === "number") ? p.FundamentalNote : p.fundamentalNote;
+      const alt = (typeof p.Accidental === "number") ? p.Accidental : (p.accidental || 0);
+      const base = PT_STEP_TO_SEMITONE[step];
+      if (base == null) return null;
+      return ((base + alt) % 12 + 12) % 12;
     } catch (e) { return null; }
+  }
+
+  // Set de semitons que cal prémer en la posició actual (totes les notes de la
+  // clau activa, siguin acord o nota sola).
+  function ptComputeExpected() {
+    const active = ptActiveNotesAtCursor();
+    const set = new Set();
+    active.forEach(n => {
+      const st = ptNoteSemitone(n);
+      if (st != null) set.add(st);
+    });
+    return set;
   }
 
   function ptEnterPractice() {
@@ -3810,21 +3817,25 @@
       ptOsmd.cursor.show();
       ptOsmd.cursor.reset();
     } catch (e) {}
-    ptAnswerWrap.classList.remove("hidden");
+    ptPianoEl.classList.remove("hidden");
+    document.body.classList.add("pt-practicing"); // per afegir padding bottom
     ptPracticeBtn.classList.add("is-active");
     ptPracticeBtn.textContent = "⏸ Aturar";
-    ptFeedbackEl.textContent = "Toca la nota que ressalta el cursor a la partitura.";
+    ptFeedbackEl.textContent = "Toca les notes que ressalta el cursor";
     ptFeedbackEl.className = "feedback";
     ptSkipToActive();
+    ptExpectedSet = ptComputeExpected();
   }
 
   function ptExitPractice() {
     ptPracticeOn = false;
     try { ptOsmd && ptOsmd.cursor && ptOsmd.cursor.hide(); } catch (e) {}
-    ptAnswerWrap.classList.add("hidden");
+    ptPianoEl.classList.add("hidden");
+    document.body.classList.remove("pt-practicing");
     ptPracticeBtn.classList.remove("is-active");
     ptPracticeBtn.textContent = "▶ Practicar";
     ptFeedbackEl.textContent = "";
+    ptExpectedSet = null;
   }
 
   function ptSetClef(staffIdx) {
@@ -3835,43 +3846,58 @@
     if (ptPracticeOn) {
       try { ptOsmd.cursor.reset(); } catch (e) {}
       ptSkipToActive();
+      ptExpectedSet = ptComputeExpected();
     }
   }
 
-  // Gestió de la resposta de l'usuari quan clica un botó Do/Re/Mi/...
-  function ptHandleAnswer(answerCa, btn) {
+  // Nom de semitó per pantalla (mostrem el nom amb sostingut, excepte si té sentit bemoll)
+  function ptSemitoneToName(st) {
+    const names = ["DO","DO♯","RE","RE♯","MI","FA","FA♯","SOL","SOL♯","LA","LA♯","SI"];
+    return names[st] || "?";
+  }
+
+  // Gestió de la pressió d'una tecla del piano (12 notes). Tecles poden ser
+  // naturals (Do/Re/Mi/...) o accidentals (Do♯, Re♯, Fa♯, Sol♯, La♯).
+  function ptHandleKey(semitone, btn) {
     if (!ptPracticeOn) return;
-    const expected = ptExpectedCaName();
-    if (!expected) {
-      // Fi de la partitura
-      ptFeedbackEl.textContent = "🎉 Has arribat al final!";
-      ptFeedbackEl.className = "feedback correct";
+    if (!ptExpectedSet || !ptExpectedSet.size) {
+      // No hi ha notes a la posició actual (fi de partitura o clau sense notes)
       return;
     }
-    if (answerCa === expected) {
-      // Encertada → cursor avança + flash verd al botó
+    if (ptExpectedSet.has(semitone)) {
+      // Coincidència! Marquem com a "premuda" i visualitzem.
       btn.classList.add("correct-flash");
-      ptFeedbackEl.textContent = "✔ " + expected.toUpperCase();
-      ptFeedbackEl.className = "feedback correct";
-      playNote(expected === "do" ? "c/4" : expected === "re" ? "d/4" :
-               expected === "mi" ? "e/4" : expected === "fa" ? "f/4" :
-               expected === "sol" ? "g/4" : expected === "la" ? "a/4" : "b/4");
+      ptExpectedSet.delete(semitone);
       setTimeout(() => btn.classList.remove("correct-flash"), 200);
-      // Avança al següent
-      try { ptOsmd.cursor.next(); } catch (e) {}
-      ptSkipToActive();
-      // Ha arribat al final?
-      if (ptOsmd.cursor.iterator.EndReached) {
-        ptFeedbackEl.textContent = "🎉 Felicitats, partitura completa!";
-        playCongratulations && playCongratulations();
-        spawnConfetti && spawnConfetti({ count: 120 });
+      if (ptExpectedSet.size === 0) {
+        // Totes les notes de la posició han estat premudes → avança cursor
+        playNote && playNote("c/4"); // so curt de confirmació
+        try { ptOsmd.cursor.next(); } catch (e) {}
+        ptSkipToActive();
+        if (ptOsmd.cursor.iterator.EndReached) {
+          ptFeedbackEl.textContent = "🎉 Felicitats, partitura completa!";
+          ptFeedbackEl.className = "feedback correct";
+          playCongratulations && playCongratulations();
+          spawnConfetti && spawnConfetti({ count: 120 });
+          ptExpectedSet = null;
+        } else {
+          ptExpectedSet = ptComputeExpected();
+          ptFeedbackEl.textContent = "";
+          ptFeedbackEl.className = "feedback";
+        }
+      } else {
+        // Falten més notes de l'acord
+        const remaining = Array.from(ptExpectedSet).map(ptSemitoneToName).join(" + ");
+        ptFeedbackEl.textContent = "✔ Falta: " + remaining;
+        ptFeedbackEl.className = "feedback correct";
       }
     } else {
-      // Errada → flash vermell, no avança, mostra què era
+      // Nota errònia → flash vermell, no avança, mostra quines faltaven
       btn.classList.add("wrong-flash");
       playErrorSound && playErrorSound();
       shakeElement && shakeElement(ptContainer);
-      ptFeedbackEl.textContent = "✖ Era " + expected.toUpperCase();
+      const missing = Array.from(ptExpectedSet).map(ptSemitoneToName).join(" + ");
+      ptFeedbackEl.textContent = "✖ Era " + missing;
       ptFeedbackEl.className = "feedback wrong";
       setTimeout(() => btn.classList.remove("wrong-flash"), 200);
     }
@@ -3888,8 +3914,8 @@
     ptClefBtns.forEach(b => {
       b.addEventListener("click", () => ptSetClef(parseInt(b.dataset.staff, 10)));
     });
-    ptNoteBtns.forEach(b => {
-      b.addEventListener("click", () => ptHandleAnswer(b.dataset.note, b));
+    ptPianoKeys.forEach(b => {
+      b.addEventListener("click", () => ptHandleKey(parseInt(b.dataset.st, 10), b));
     });
   }
 

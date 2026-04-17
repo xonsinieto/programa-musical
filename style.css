@@ -2601,9 +2601,133 @@ main {
   box-shadow: 0 2px 8px rgba(0, 240, 255, 0.3);
 }
 
-/* Botons de resposta a Partitures — apareixen en mode practicar */
-.pt-answer-buttons { margin-top: 8px; }
-.pt-answer-buttons.hidden { display: none; }
+/* Piano fix a sota de la pantalla quan practiques a Partitures */
+.pt-piano {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 900;
+  padding: 10px 12px 12px;
+  background: rgba(5, 7, 15, 0.95);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  border-top: 1px solid rgba(0, 240, 255, 0.25);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+.pt-piano.hidden { display: none; }
+
+/* Afegim padding-bottom al body quan el piano està visible per evitar
+   que el contingut quedi tapat quan fas scroll al final */
+body.pt-practicing #screen-partitures { padding-bottom: 170px; }
+@media (max-width: 600px) {
+  body.pt-practicing #screen-partitures { padding-bottom: 150px; }
+}
+
+.pt-piano-row {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  align-items: flex-end;
+}
+/* Row d'accidentals: alineada amb els espais entre tecles naturals */
+.pt-piano-accidentals { margin-bottom: 2px; }
+.pt-spacer {
+  flex: 0 0 auto;
+  pointer-events: none;
+}
+/* Espai per separar Mi-Fa (no hi ha tecla negra entre ells) */
+.pt-spacer-half { width: 32px; }      /* mitja tecla blanca al principi i al final */
+.pt-spacer-full { width: 68px; }      /* una tecla blanca al mig (Mi-Fa) */
+
+/* Tecla genèrica */
+.pt-key {
+  font-family: var(--font-display);
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Tecles blanques (naturals) */
+.pt-key-nat {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 56px;
+  background: linear-gradient(#FDF8EC, #F6EFE0);
+  border: 1px solid #CBB48A;
+  color: #1a1a1a;
+  font-size: 1rem;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4), inset 0 -2px 0 rgba(150, 120, 70, 0.3);
+}
+.pt-key-nat:hover {
+  background: linear-gradient(#FFFAF0, #F9F2E2);
+  transform: translateY(-1px);
+}
+.pt-key-nat:active {
+  background: linear-gradient(#EDE2C5, #E5D9B8);
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Tecles negres (accidentals) */
+.pt-key-acc {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 44px;
+  background: linear-gradient(#1a1a1a, #0a0a0a);
+  border: 1px solid #000;
+  color: #e8ecf1;
+  font-size: 0.76rem;
+  line-height: 1;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6), inset 0 -2px 0 rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+.pt-key-acc small {
+  font-size: 0.55rem;
+  opacity: 0.65;
+  font-weight: 400;
+  font-family: var(--font-mono);
+}
+.pt-key-acc:hover {
+  background: linear-gradient(#2a2a2a, #1a1a1a);
+  transform: translateY(-1px);
+}
+.pt-key-acc:active {
+  background: linear-gradient(#000, #000);
+  transform: translateY(1px);
+}
+
+/* Flash d'encert / errada */
+.pt-key.correct-flash {
+  background: linear-gradient(#00FF94, #00C06F) !important;
+  color: #05070F !important;
+  box-shadow: 0 0 20px rgba(0, 255, 148, 0.7) !important;
+}
+.pt-key.wrong-flash {
+  background: linear-gradient(#FF3366, #C41E4B) !important;
+  color: #fff !important;
+  box-shadow: 0 0 20px rgba(255, 51, 102, 0.7) !important;
+}
+
+@media (max-width: 600px) {
+  .pt-piano { padding: 8px 6px 10px; }
+  .pt-key-nat { width: 42px; height: 48px; font-size: 0.85rem; }
+  .pt-key-acc { width: 32px; height: 38px; font-size: 0.62rem; }
+  .pt-key-acc small { font-size: 0.46rem; }
+  .pt-spacer-half { width: 21px; }
+  .pt-spacer-full { width: 46px; }
+}
 
 @media (max-width: 600px) {
   .pt-clef-btn { padding: 4px 10px; font-size: 0.7rem; }
