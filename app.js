@@ -3539,37 +3539,67 @@
       // Zoom més baix → més compassos per línia (com al PDF original amb 5-6/línia).
       const isMobile = window.innerWidth < 600;
       ptOsmd.zoom = isMobile ? 0.48 : 0.65;
-      // Vertical balancejat: títol NO enganxat a dalt NI enganxat a la primera línia.
-      // Queda centrat dins l'espai blanc superior, com en un full impres real.
+      // Títol amb respir sota (ample) i a prop del marge superior del paper
       try {
         const er = ptOsmd.EngravingRules;
         if (er) {
-          if ("TitleTopDistance" in er) er.TitleTopDistance = 6;
-          if ("TitleBottomDistance" in er) er.TitleBottomDistance = 12;
-          if ("PageTopMargin" in er) er.PageTopMargin = 2;
-          if ("PageTopMarginNarrow" in er) er.PageTopMarginNarrow = 2;
+          if ("TitleTopDistance" in er) er.TitleTopDistance = 1;
+          if ("TitleBottomDistance" in er) er.TitleBottomDistance = 14;
+          if ("PageTopMargin" in er) er.PageTopMargin = 0;
+          if ("PageTopMarginNarrow" in er) er.PageTopMarginNarrow = 0;
         }
       } catch (e) { /* EngravingRules diferents segons versió d'OSMD */ }
       ptOsmd.render();
 
-      // Post-processat: elimina qualsevol rectangle de fons que OSMD hagi pintat
-      // (això és el que causava el "dos papers" que veu l'usuari). Deixem
-      // transparent perquè es vegi només el paper cream del contenidor.
+      // Post-processat del SVG:
+      // 1) Treure qualsevol rectangle de fons (era el "dos papers" gris)
+      // 2) RETALLAR l'espai buit de dalt del SVG — detectem on comença el primer
+      //    element visible i ajustem el viewBox perquè el paper aprofiti l'espai
+      //    sense buit superior. Així el títol queda a prop del marge superior
+      //    del paper, com a un full imprès real.
       const svg = ptContainer.querySelector("svg");
       if (svg) {
         svg.style.background = "transparent";
-        // Els primers <rect> sense class, amb fill diferent de 'none', són normalment
-        // la pàgina de fons. Els fem transparents.
         Array.from(svg.querySelectorAll("rect")).forEach(r => {
           const w = parseFloat(r.getAttribute("width") || "0");
           const h = parseFloat(r.getAttribute("height") || "0");
           const fill = r.getAttribute("fill");
-          // Els rectangles grans (amples > 400) sense classe són el fons de pàgina
           if (w > 400 && h > 400 && fill && fill !== "none") {
             r.setAttribute("fill", "transparent");
             r.setAttribute("stroke", "none");
           }
         });
+
+        // Retall del buit superior via viewBox
+        try {
+          // Troba la Y mínima de qualsevol element renderitzat (text, paths, lines)
+          let minY = Infinity;
+          const elements = svg.querySelectorAll("text, path, line, g");
+          elements.forEach(el => {
+            if (!el.getBBox) return;
+            try {
+              const bb = el.getBBox();
+              if (bb && bb.width > 0 && bb.height > 0 && bb.y < minY) minY = bb.y;
+            } catch (e) { /* getBBox pot fallar en elements no renderitzats */ }
+          });
+          // Si hi ha un buit significatiu (>20 unitats SVG), retallem
+          if (isFinite(minY) && minY > 20) {
+            const vb = svg.getAttribute("viewBox");
+            if (vb) {
+              const parts = vb.split(/\s+/).map(parseFloat);
+              if (parts.length === 4) {
+                const [vx, vy, vw, vh] = parts;
+                const cropY = Math.max(0, minY - 8); // deixa 8 unitats de respir al damunt
+                svg.setAttribute("viewBox", vx + " " + (vy + cropY) + " " + vw + " " + (vh - cropY));
+                // Ajusta també l'alçada intrínseca perquè no es distorsioni
+                const currentH = parseFloat(svg.getAttribute("height") || vh);
+                if (currentH > 0) {
+                  svg.setAttribute("height", currentH - cropY);
+                }
+              }
+            }
+          }
+        } catch (e) { /* bbox no disponible */ }
       }
 
       const info = [
