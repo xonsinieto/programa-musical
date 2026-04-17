@@ -2525,9 +2525,9 @@ main {
   overflow-y: visible;
 }
 #pt-staff-container {
-  /* Variables CSS editables via JS pel panell d'ajust */
-  --pt-crop: 60px;
-  --pt-padding-top: 0px;
+  /* Variables CSS editables via JS pel panell d'ajust. Valors calibrats. */
+  --pt-crop: 70px;
+  --pt-padding-top: 4px;
   padding-top: var(--pt-padding-top);
 }
 #pt-staff-container svg {

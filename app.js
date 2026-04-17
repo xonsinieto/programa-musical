@@ -3447,12 +3447,13 @@
   const ptCopyBtn      = document.getElementById("pt-copy-btn");
   const ptResetBtn     = document.getElementById("pt-reset-btn");
   const PT_CFG_KEY     = "ptSpaceConfig_v1";
-  // Valors per defecte del panell d'ajust (el user pot canviar-los amb els sliders):
-  // - padding 0: paper toca el contingut (no marge extra)
-  // - ttop 0, tbot 14: OSMD dibuixa títol a dalt i deixa respir gran abans del primer compàs
-  // - crop 60: talla 60px del buit superior del SVG (valor que s'apropa al que l'usuari vol)
-  // - zoom 0.65: mida de les notes
-  const PT_DEFAULTS    = { padding: 0, ttop: 0, tbot: 14, crop: 60, zoom: 0.65 };
+  // Valors per defecte calibrats per l'usuari amb el panell d'ajust (17/04/2026):
+  // - padding 4: mica de respir sota el contenidor, amb el paper ja tocat a dalt
+  // - ttop 0: títol al marge superior del SVG
+  // - tbot 7: espai compacte però clar entre títol i primer compàs
+  // - crop 70: retalla 70px del buit superior del SVG
+  // - zoom 0.67: 5-6 compassos per línia com al PDF original
+  const PT_DEFAULTS    = { padding: 4, ttop: 0, tbot: 7, crop: 70, zoom: 0.67 };
 
   function ptLoadConfig() {
     try {
