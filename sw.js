@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v51-piano-works";
+const CACHE = "lectura-notes-v52-xml-parser";
 const FILES = [
   "./",
   "./index.html",

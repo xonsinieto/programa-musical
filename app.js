@@ -3452,11 +3452,94 @@
   const ptClefBtns     = document.querySelectorAll(".pt-clef-btn");
   const ptPianoKeys    = document.querySelectorAll(".pt-key");
   let ptPracticeOn = false;
-  let ptActiveStaff = 0; // 0 = Sol (treble), 1 = Fa (bass)
-  // Set de semitons que falten per prémer en el "temps" actual de la partitura
-  let ptExpectedSet = null; // Set<number> o null si no actiu
-  // Base MIDI semitone per cada lletra (C=0, D=2, E=4, F=5, G=7, A=9, B=11)
+  let ptActiveStaff = 0; // 0 = Sol (treble = staff 1 XML), 1 = Fa (bass = staff 2 XML)
   const PT_STEP_TO_SEMITONE = [0, 2, 4, 5, 7, 9, 11];
+  const PT_STEP_NAME = { C: 0, D: 1, E: 2, F: 3, G: 4, A: 5, B: 6 };
+  // Track d'esdeveniments parsejats del MusicXML — ens dona control total
+  // sobre les notes i l'ordre de lectura sense dependre de l'API d'OSMD.
+  let ptTrackAll = []; // tots els events (tots els staves, voice 1)
+  let ptTrack = [];    // filtrat pel staff actiu
+  let ptTrackIdx = 0;
+  let ptPressedInCurrent = new Set();
+
+  // Parser MusicXML → events: [{measure, staff, notes: [{step, octave, alter, semitone, pitch}...]}]
+  // Notes de cada event ordenades de dalt (més aguda) cap avall, per facilitar
+  // el sistema "toca de dalt cap a baix" dels acords.
+  function ptParseEvents(xmlText) {
+    const doc = new DOMParser().parseFromString(xmlText, "text/xml");
+    const events = [];
+    const part = doc.querySelector("part");
+    if (!part) return events;
+
+    Array.from(part.querySelectorAll("measure")).forEach((mEl, mIdx) => {
+      const measureNum = parseInt(mEl.getAttribute("number"), 10) || (mIdx + 1);
+      let lastEvent = null;
+
+      Array.from(mEl.children).forEach(el => {
+        if (el.tagName !== "note") return;
+        // Només voice 1 (melodia principal) per començar.
+        const voiceEl = el.querySelector(":scope > voice");
+        const voice = voiceEl ? parseInt(voiceEl.textContent, 10) : 1;
+        if (voice !== 1) return;
+
+        const isChord = !!el.querySelector(":scope > chord");
+        const isRest = !!el.querySelector(":scope > rest");
+        if (isRest) { lastEvent = null; return; }
+
+        const pitchEl = el.querySelector(":scope > pitch");
+        if (!pitchEl) return;
+
+        const step = pitchEl.querySelector("step")?.textContent || "C";
+        const octave = parseInt(pitchEl.querySelector("octave")?.textContent || "4", 10);
+        const alterEl = pitchEl.querySelector("alter");
+        const alter = alterEl ? parseInt(alterEl.textContent, 10) : 0;
+        const staffEl = el.querySelector(":scope > staff");
+        const staff = staffEl ? parseInt(staffEl.textContent, 10) : 1;
+
+        const semiBase = PT_STEP_TO_SEMITONE[PT_STEP_NAME[step] || 0];
+        const semitone = ((semiBase + alter) % 12 + 12) % 12;
+        const pitch = octave * 12 + semiBase + alter;
+
+        const note = { step, octave, alter, semitone, pitch };
+
+        if (isChord && lastEvent && lastEvent.staff === staff) {
+          lastEvent.notes.push(note);
+          lastEvent.notes.sort((a, b) => b.pitch - a.pitch); // top-down
+        } else {
+          lastEvent = { measure: measureNum, staff, notes: [note] };
+          events.push(lastEvent);
+        }
+      });
+    });
+    return events;
+  }
+
+  function ptRefreshTrack() {
+    const xmlStaffNum = ptActiveStaff + 1;
+    ptTrack = ptTrackAll.filter(ev => ev.staff === xmlStaffNum);
+    ptTrackIdx = 0;
+    ptPressedInCurrent = new Set();
+  }
+
+  function ptFormatNoteNameCA(note) {
+    const names = ["DO","RE","MI","FA","SOL","LA","SI"];
+    const idx = PT_STEP_NAME[note.step] || 0;
+    let name = names[idx];
+    if (note.alter === 1) name += "♯";
+    else if (note.alter === -1) name += "♭";
+    else if (note.alter === 2) name += "𝄪";
+    else if (note.alter === -2) name += "𝄫";
+    return name + note.octave;
+  }
+
+  function ptFormatEventName(ev) {
+    return ev.notes.map(ptFormatNoteNameCA).join(" + ");
+  }
+
+  function ptSemitoneToName(st) {
+    const names = ["DO","DO♯","RE","RE♯","MI","FA","FA♯","SOL","SOL♯","LA","LA♯","SI"];
+    return names[st] || "?";
+  }
   const PT_CFG_KEY     = "ptSpaceConfig_v1";
   // Valors per defecte calibrats per l'usuari amb el panell d'ajust (17/04/2026):
   // - padding 4: mica de respir sota el contenidor, amb el paper ja tocat a dalt
@@ -3552,6 +3635,11 @@
 
     try {
       const xmlText = await ptLoadMusicXmlText(item.file);
+
+      // Parser propi: ens dona control total sobre les notes i l'ordre de lectura
+      // (no depenem de l'API de cursor d'OSMD, que era inestable).
+      ptTrackAll = ptParseEvents(xmlText);
+      ptRefreshTrack();
 
       if (typeof opensheetmusicdisplay === "undefined") {
         throw new Error("OpenSheetMusicDisplay no s'ha carregat des del CDN");
@@ -3721,97 +3809,36 @@
     }
   }
 
-  // --- MODE LECTURA (practicar amb cursor d'OSMD) ---
-  // Mapeig català per mostrar els noms ("do/re/mi/fa/sol/la/si") a partir de la
-  // "FundamentalNote" d'OSMD (0=C, 1=D, 2=E, 3=F, 4=G, 5=A, 6=B).
-  const PT_CA_NAMES = ["DO", "RE", "MI", "FA", "SOL", "LA", "SI"];
+  // --- MODE LECTURA (track parsejat del MusicXML, no depenem d'OSMD cursor) ---
 
-  function ptCursorNotes() {
-    if (!ptOsmd || !ptOsmd.cursor) return [];
-    try { return ptOsmd.cursor.NotesUnderCursor() || []; }
-    catch (e) { return []; }
+  function ptCurrentEvent() { return ptTrack[ptTrackIdx] || null; }
+
+  function ptCurrentExpectedSemitones() {
+    const ev = ptCurrentEvent();
+    if (!ev) return new Set();
+    return new Set(ev.notes.map(n => n.semitone));
   }
 
-  // Índex de staff d'una nota: 0 = clau superior (Sol), 1 = inferior (Fa)
-  function ptNoteStaffIndex(n) {
-    try {
-      // Versions modernes d'OSMD
-      const s = n.sourceStaffEntry && n.sourceStaffEntry.parentStaff;
-      if (s && typeof s.idInMusicSheet === "number") return s.idInMusicSheet;
-    } catch (e) {}
-    try {
-      const s2 = n.ParentVoiceEntry && n.ParentVoiceEntry.ParentSourceStaffEntry
-                 && n.ParentVoiceEntry.ParentSourceStaffEntry.ParentStaff;
-      if (s2 && typeof s2.IdInMusicSheet === "number") return s2.IdInMusicSheet;
-    } catch (e) {}
-    return 0;
-  }
-
-  function ptIsRestNote(n) {
-    // En OSMD `isRest` és un getter booleà, no una funció.
-    return !!(n && (n.isRest === true));
-  }
-
-  function ptActiveNotesAtCursor() {
-    // Temporal: no filtrem per staff perquè la detecció (idInMusicSheet) no és
-    // fiable a la versió d'OSMD actual. Agafem TOTES les notes de la posició
-    // del cursor (tot just descartant els silencis). Més endavant, quan
-    // implementem detecció de staff robusta, afegirem el filtre per clau activa.
-    const all = ptCursorNotes();
-    return all.filter(n => !ptIsRestNote(n));
-  }
-
-  // Format d'una nota: "RE♭4", "SOL5", etc.
-  function ptFormatNoteName(n) {
-    try {
-      const p = n.Pitch || n.pitch;
-      if (!p) return "?";
-      const step = (typeof p.FundamentalNote === "number") ? p.FundamentalNote : p.fundamentalNote;
-      const oct = (typeof p.Octave === "number") ? p.Octave : p.octave;
-      const alt = (typeof p.Accidental === "number") ? p.Accidental : (p.accidental || 0);
-      let name = PT_CA_NAMES[step] || "?";
-      if (alt === 1) name += "♯";
-      else if (alt === -1) name += "♭";
-      else if (alt === 2) name += "𝄪";
-      else if (alt === -2) name += "𝄫";
-      return name + oct;
-    } catch (e) { return "?"; }
-  }
-
-  // Avança fins a una posició que tingui notes a la clau activa (salta silencis).
-  function ptSkipToActive() {
-    if (!ptOsmd || !ptOsmd.cursor) return;
-    let steps = 0;
-    while (steps++ < 500 && !ptOsmd.cursor.iterator.EndReached) {
-      const active = ptActiveNotesAtCursor();
-      if (active.length > 0) return;
-      ptOsmd.cursor.next();
+  function ptDisplayCurrent() {
+    const ev = ptCurrentEvent();
+    if (!ev) {
+      ptFeedbackEl.textContent = "🎉 Fi de la partitura";
+      ptFeedbackEl.className = "feedback correct";
+      return;
     }
+    const name = ptFormatEventName(ev);
+    ptFeedbackEl.textContent = "Toca: " + name + "  (compàs " + ev.measure + ")";
+    ptFeedbackEl.className = "feedback";
   }
 
-  // Retorna el semitó (0-11) d'una nota OSMD. Do=0, Do♯=1, Re=2, ..., Si=11.
-  function ptNoteSemitone(n) {
+  // Avança el cursor visual d'OSMD per sincronitzar-lo amb el nostre índex.
+  // Si OSMD no respon, ens ho guardem — la lògica del joc funciona igual.
+  function ptAdvanceOsmdCursor() {
     try {
-      const p = n.Pitch || n.pitch;
-      if (!p) return null;
-      const step = (typeof p.FundamentalNote === "number") ? p.FundamentalNote : p.fundamentalNote;
-      const alt = (typeof p.Accidental === "number") ? p.Accidental : (p.accidental || 0);
-      const base = PT_STEP_TO_SEMITONE[step];
-      if (base == null) return null;
-      return ((base + alt) % 12 + 12) % 12;
-    } catch (e) { return null; }
-  }
-
-  // Set de semitons que cal prémer en la posició actual (totes les notes de la
-  // clau activa, siguin acord o nota sola).
-  function ptComputeExpected() {
-    const active = ptActiveNotesAtCursor();
-    const set = new Set();
-    active.forEach(n => {
-      const st = ptNoteSemitone(n);
-      if (st != null) set.add(st);
-    });
-    return set;
+      if (ptOsmd && ptOsmd.cursor && !ptOsmd.cursor.iterator.EndReached) {
+        ptOsmd.cursor.next();
+      }
+    } catch (e) { /* no fatal */ }
   }
 
   function ptEnterPractice() {
@@ -3822,13 +3849,11 @@
       ptOsmd.cursor.reset();
     } catch (e) {}
     ptPianoEl.classList.remove("hidden");
-    document.body.classList.add("pt-practicing"); // per afegir padding bottom
+    document.body.classList.add("pt-practicing");
     ptPracticeBtn.classList.add("is-active");
     ptPracticeBtn.textContent = "⏸ Aturar";
-    ptFeedbackEl.textContent = "Toca les notes que ressalta el cursor";
-    ptFeedbackEl.className = "feedback";
-    ptSkipToActive();
-    ptExpectedSet = ptComputeExpected();
+    ptRefreshTrack();
+    ptDisplayCurrent();
   }
 
   function ptExitPractice() {
@@ -3839,7 +3864,7 @@
     ptPracticeBtn.classList.remove("is-active");
     ptPracticeBtn.textContent = "▶ Practicar";
     ptFeedbackEl.textContent = "";
-    ptExpectedSet = null;
+    ptPressedInCurrent = new Set();
   }
 
   function ptSetClef(staffIdx) {
@@ -3849,59 +3874,58 @@
     });
     if (ptPracticeOn) {
       try { ptOsmd.cursor.reset(); } catch (e) {}
-      ptSkipToActive();
-      ptExpectedSet = ptComputeExpected();
+      ptRefreshTrack();
+      ptDisplayCurrent();
     }
   }
 
-  // Nom de semitó per pantalla (mostrem el nom amb sostingut, excepte si té sentit bemoll)
-  function ptSemitoneToName(st) {
-    const names = ["DO","DO♯","RE","RE♯","MI","FA","FA♯","SOL","SOL♯","LA","LA♯","SI"];
-    return names[st] || "?";
-  }
-
-  // Gestió de la pressió d'una tecla del piano (12 notes). Tecles poden ser
-  // naturals (Do/Re/Mi/...) o accidentals (Do♯, Re♯, Fa♯, Sol♯, La♯).
+  // Clic a una tecla del piano (12 notes: 7 naturals + 5 accidentals).
   function ptHandleKey(semitone, btn) {
     if (!ptPracticeOn) return;
-    if (!ptExpectedSet || !ptExpectedSet.size) {
-      // No hi ha notes a la posició actual (fi de partitura o clau sense notes)
+    const expected = ptCurrentExpectedSemitones();
+    if (expected.size === 0) {
+      ptFeedbackEl.textContent = "🎉 Fi de la partitura";
+      ptFeedbackEl.className = "feedback correct";
       return;
     }
-    if (ptExpectedSet.has(semitone)) {
-      // Coincidència! Marquem com a "premuda" i visualitzem.
+
+    if (expected.has(semitone) && !ptPressedInCurrent.has(semitone)) {
+      // Nota correcta que no havíem premut encara
+      ptPressedInCurrent.add(semitone);
       btn.classList.add("correct-flash");
-      ptExpectedSet.delete(semitone);
       setTimeout(() => btn.classList.remove("correct-flash"), 200);
-      if (ptExpectedSet.size === 0) {
-        // Totes les notes de la posició han estat premudes → avança cursor
-        playNote && playNote("c/4"); // so curt de confirmació
-        try { ptOsmd.cursor.next(); } catch (e) {}
-        ptSkipToActive();
-        if (ptOsmd.cursor.iterator.EndReached) {
+
+      if (ptPressedInCurrent.size >= expected.size) {
+        // Acord complet → avança
+        ptTrackIdx++;
+        ptPressedInCurrent = new Set();
+        ptAdvanceOsmdCursor();
+
+        if (ptTrackIdx >= ptTrack.length) {
           ptFeedbackEl.textContent = "🎉 Felicitats, partitura completa!";
           ptFeedbackEl.className = "feedback correct";
           playCongratulations && playCongratulations();
           spawnConfetti && spawnConfetti({ count: 120 });
-          ptExpectedSet = null;
         } else {
-          ptExpectedSet = ptComputeExpected();
-          ptFeedbackEl.textContent = "";
-          ptFeedbackEl.className = "feedback";
+          ptDisplayCurrent();
         }
       } else {
-        // Falten més notes de l'acord
-        const remaining = Array.from(ptExpectedSet).map(ptSemitoneToName).join(" + ");
-        ptFeedbackEl.textContent = "✔ Falta: " + remaining;
+        // Falten notes per completar l'acord
+        const stillNeeded = Array.from(expected).filter(s => !ptPressedInCurrent.has(s));
+        ptFeedbackEl.textContent = "✔ Falta: " + stillNeeded.map(ptSemitoneToName).join(" + ");
         ptFeedbackEl.className = "feedback correct";
       }
+    } else if (expected.has(semitone)) {
+      // Ja l'havia premut; ignorem sense marcar error.
+      return;
     } else {
-      // Nota errònia → flash vermell, no avança, mostra quines faltaven
+      // Tecla errònia
       btn.classList.add("wrong-flash");
       playErrorSound && playErrorSound();
       shakeElement && shakeElement(ptContainer);
-      const missing = Array.from(ptExpectedSet).map(ptSemitoneToName).join(" + ");
-      ptFeedbackEl.textContent = "✖ Era " + missing;
+      const ev = ptCurrentEvent();
+      const correctName = ev ? ptFormatEventName(ev) : "?";
+      ptFeedbackEl.textContent = "✖ Era " + correctName;
       ptFeedbackEl.className = "feedback wrong";
       setTimeout(() => btn.classList.remove("wrong-flash"), 200);
     }
@@ -3954,6 +3978,11 @@
   const screens = document.querySelectorAll(".screen");
 
   function switchScreen(screenId) {
+    // Si sortim de Partitures mentre practiquem, aturem el mode (amaga el piano,
+    // treu el padding-bottom del body, etc.)
+    if (ptPracticeOn && screenId !== "partitures") {
+      ptExitPractice();
+    }
     tabs.forEach(t => t.classList.toggle("active", t.dataset.screen === screenId));
     screens.forEach(s => s.classList.toggle("active", s.id === "screen-" + screenId));
     if (screenId === "reference")   renderReference();
