@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v42-css-crop";
+const CACHE = "lectura-notes-v43-css-vars-persist";
 const FILES = [
   "./",
   "./index.html",

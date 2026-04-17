@@ -2524,9 +2524,18 @@ main {
   overflow-x: auto;
   overflow-y: visible;
 }
+#pt-staff-container {
+  /* Variables CSS editables via JS pel panell d'ajust */
+  --pt-crop: 60px;
+  --pt-padding-top: 0px;
+  padding-top: var(--pt-padding-top);
+}
 #pt-staff-container svg {
   display: block;
   margin: 0 auto;
+  margin-top: calc(-1 * var(--pt-crop, 0px));
+  clip-path: inset(var(--pt-crop, 0px) 0 0 0);
+  -webkit-clip-path: inset(var(--pt-crop, 0px) 0 0 0);
   background: transparent !important;
   max-width: 100%;
 }

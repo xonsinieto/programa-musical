@@ -3553,10 +3553,8 @@
         drawCredits: false,
         drawSubtitle: false,
         drawPartNames: false,
-        autoResize: true,
-        pageFormat: "Endless", // tota la partitura seguida, scroll vertical
-        // No passem pageBackgroundColor — així OSMD no pinta un "segon full" a sota
-        // i es veu el paper cream del contenidor com un de sol.
+        autoResize: false, // IMPORTANT: sinó OSMD re-renderitza sol i perd els nostres estils
+        pageFormat: "Endless",
         drawingParameters: "compact"
       });
 
@@ -3594,19 +3592,11 @@
           }
         });
 
-        // Retall amb CSS: clip-path talla el top + margin-top negatiu omple el buit.
-        // `ptCfg.crop` s'interpreta ara com a PÍXELS CSS, directes i visibles.
-        const cropPx = Math.max(0, ptCfg.crop || 0);
-        if (cropPx > 0) {
-          svg.style.clipPath = "inset(" + cropPx + "px 0 0 0)";
-          svg.style.webkitClipPath = "inset(" + cropPx + "px 0 0 0)";
-          svg.style.marginTop = "-" + cropPx + "px";
-        } else {
-          svg.style.clipPath = "";
-          svg.style.webkitClipPath = "";
-          svg.style.marginTop = "";
-        }
       }
+      // El retall del top i el padding del paper s'apliquen via CSS VARIABLE sobre
+      // el contenidor (NO inline al SVG) — així sobreviuen a qualsevol re-render
+      // futur d'OSMD. Veure la regla CSS '#pt-staff-container svg' a style.css.
+      ptApplyCssVars();
 
       const info = [
         item.name,
@@ -3622,6 +3612,16 @@
       ptContainer.innerHTML = "<p style='padding:20px;color:#FF3366;font-family:var(--font-mono)'>No s'ha pogut renderitzar la partitura.<br>" + (e.message || "") + "</p>";
       console.error("[Partitures] Error:", e);
     }
+  }
+
+  // Aplica les variables CSS del contenidor a partir de ptCfg.
+  // Aquest és l'enfoc fiable: variables CSS → les regles del style.css s'apliquen
+  // automàticament a qualsevol SVG dins del contenidor, fins i tot després de
+  // re-renders d'OSMD. Els canvis són instantanis al moure el slider.
+  function ptApplyCssVars() {
+    if (!ptContainer) return;
+    ptContainer.style.setProperty("--pt-crop", (ptCfg.crop || 0) + "px");
+    ptContainer.style.setProperty("--pt-padding-top", (ptCfg.padding || 0) + "px");
   }
 
   // --- Panell d'ajust d'espai (sliders live amb debounce) ---
@@ -3659,18 +3659,25 @@
       const lbl = document.getElementById(s.lbl);
       if (!sl) return;
       sl.addEventListener("input", () => {
-        const v = s.id === "zoom" ? parseFloat(sl.value) : parseFloat(sl.value);
+        const v = parseFloat(sl.value);
         ptCfg[s.id] = v;
         if (lbl) lbl.textContent = s.fmt(v);
-        // Debounce: re-renderitzem 250ms després de l'últim canvi (renderitzar
-        // 99 compassos pot trigar ~1s; evitem fer-ho 100 vegades al moure el slider)
-        clearTimeout(ptAdjustDebounce);
-        ptAdjustDebounce = setTimeout(() => {
-          ptSaveConfig(ptCfg);
-          const id = ptSelect.value;
-          const item = (ptCatalog || []).find(p => p.id === id);
-          if (item) ptRenderPartitura(item);
-        }, 250);
+
+        // Canvi INSTANTANI sense re-render per crop i padding (CSS variables).
+        // Per ttop/tbot/zoom cal re-renderitzar perquè OSMD torni a dibuixar.
+        if (s.id === "crop" || s.id === "padding") {
+          ptApplyCssVars();
+          clearTimeout(ptAdjustDebounce);
+          ptAdjustDebounce = setTimeout(() => ptSaveConfig(ptCfg), 300);
+        } else {
+          clearTimeout(ptAdjustDebounce);
+          ptAdjustDebounce = setTimeout(() => {
+            ptSaveConfig(ptCfg);
+            const id = ptSelect.value;
+            const item = (ptCatalog || []).find(p => p.id === id);
+            if (item) ptRenderPartitura(item);
+          }, 350);
+        }
       });
     });
 
