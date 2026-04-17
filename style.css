@@ -2601,18 +2601,10 @@ main {
   box-shadow: 0 2px 8px rgba(0, 240, 255, 0.3);
 }
 
-/* Cursor d'OSMD: per defecte inline té z-index:-1 (queda DARRERE del SVG).
-   L'elevem a sobre amb !important. Després amb JS substituïm la imatge per una
-   PNG 1x1 transparent i apliquem backgroundColor blau, així el "cursor" és
-   un simple rectangle blau que ressalta la nota actual. */
+/* OSMD dibuixa el cursor com a <img>. L'amagem del tot — no volem cap rectangle.
+   La "nota actual" es ressalta pintant el SVG path de la nota en blau directament. */
 #pt-staff-container img {
-  z-index: 10 !important;
-  background-color: rgba(30, 144, 255, 0.45) !important;
-  box-shadow: 0 0 10px rgba(30, 144, 255, 0.6) !important;
-  border-radius: 3px !important;
-  opacity: 1 !important;
-  filter: none !important;
-  mix-blend-mode: normal !important;
+  display: none !important;
 }
 
 /* Piano fix a sota de la pantalla quan practiques a Partitures */

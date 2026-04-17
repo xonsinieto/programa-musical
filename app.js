@@ -3831,82 +3831,108 @@
     ptFeedbackEl.className = "feedback";
   }
 
-  // Referències a les notes actualment pintades de blau perquè puguem restaurar-les
-  let ptLastColoredNotes = [];
   const PT_BLUE = "#1E90FF";
-  const PT_DEFAULT_NOTE_COLOR = "#000000";
-  // PNG 1x1 transparent — per substituir la imatge del cursor d'OSMD, mantenint
-  // les dimensions del cursor però mostrant només el backgroundColor blau.
-  const PT_TRANSPARENT_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+  const PT_RED  = "#E74C3C";
 
-  // Substitueix la imatge PNG del cursor d'OSMD per una transparent, deixant
-  // que el background-color blau del CSS sigui visible com a rectangle.
-  function ptStyleCursor() {
-    const imgs = ptContainer.querySelectorAll("img");
-    imgs.forEach(img => {
-      if (!img.dataset.ptOrigWidth) {
-        img.dataset.ptOrigWidth = img.width || img.getAttribute("width") || 20;
-        img.dataset.ptOrigHeight = img.height || img.getAttribute("height") || 40;
-      }
-      if (img.src !== PT_TRANSPARENT_PNG) img.src = PT_TRANSPARENT_PNG;
-      img.style.width = img.dataset.ptOrigWidth + "px";
-      img.style.height = img.dataset.ptOrigHeight + "px";
+  // Etiquetem les notes SVG directament via DOM (no API d'OSMD, que no té
+  // `getSVGGElement` a la v1.9). Estructura d'OSMD:
+  //   #pt-staff-container svg g.staffline[id='Instr. PX-Y']
+  //     > g.vf-measure
+  //       > g.vf-stavenote     ← la nota!
+  //
+  // Hi ha 2 stafflines per piano (Sol + Fa). Els identifiquem per ordre DOM:
+  // staffline[0] = Sol, staffline[1] = Fa.
+  //
+  // Dins cada staffline, els `.vf-stavenote` estan en ordre de lectura (compàs
+  // a compàs, esquerra a dreta). Els etiquetem amb `data-pt-sol="N"` o
+  // `data-pt-fa="N"` per poder-los trobar després.
+  //
+  // Nota: OSMD no distingeix voice 1 de voice 2 a nivell DOM, així que inclourem
+  // TOTES les notes d'un staff. Per tant, ptTrack (que filtra a voice 1) pot no
+  // coincidir nota a nota. Acceptem això per ara; és millor tenir ALGUNA nota
+  // blava que cap.
+  function ptLabelSVGNotes() {
+    if (!ptContainer) return;
+    const stafflines = ptContainer.querySelectorAll("svg g.staffline");
+    if (stafflines.length === 0) return;
+    // OSMD produeix un STAFFLINE per cada LÍNIA VISUAL. Per 99 compassos
+    // partits en ~17 línies hi ha 17*2 = 34 stafflines. Les parelles són
+    // [treble, bass, treble, bass, ...]. slIdx%2==0 → Sol, %2==1 → Fa.
+    let iSol = 0, iFa = 0;
+    stafflines.forEach((sl, slIdx) => {
+      const isTreble = (slIdx % 2 === 0);
+      const attr = isTreble ? "data-pt-sol" : "data-pt-fa";
+      const notes = sl.querySelectorAll("g.vf-stavenote");
+      notes.forEach(noteEl => {
+        noteEl.setAttribute(attr, isTreble ? iSol++ : iFa++);
+      });
     });
   }
 
-  function ptResetNoteColors() {
-    ptLastColoredNotes.forEach(gn => {
-      try { if (gn && gn.setColor) gn.setColor(PT_DEFAULT_NOTE_COLOR, { applyToBeams: false }); } catch (e) {}
-    });
-    ptLastColoredNotes = [];
-  }
-
-  function ptColorCurrentNote() {
-    ptResetNoteColors();
-    try {
-      if (!ptOsmd || !ptOsmd.cursor) return;
-      const gnotes = ptOsmd.cursor.GNotesUnderCursor ? ptOsmd.cursor.GNotesUnderCursor() : [];
-      gnotes.forEach(gn => {
-        if (gn && gn.setColor) {
-          gn.setColor(PT_BLUE, { applyToBeams: false });
-          ptLastColoredNotes.push(gn);
+  function ptResetAllSVGNoteColors() {
+    if (!ptContainer) return;
+    ptContainer.querySelectorAll("[data-pt-sol], [data-pt-fa]").forEach(g => {
+      g.classList.remove("pt-note-current");
+      g.querySelectorAll("path, ellipse").forEach(el => {
+        if (el.dataset.ptOrigFill !== undefined) {
+          el.setAttribute("fill", el.dataset.ptOrigFill);
         }
       });
-    } catch (e) { /* API pot fallar segons versió; no fatal */ }
+    });
   }
 
-  // Avança el cursor visual d'OSMD i pinta la nova nota en blau.
-  function ptAdvanceOsmdCursor() {
-    try {
-      if (ptOsmd && ptOsmd.cursor && !ptOsmd.cursor.iterator.EndReached) {
-        ptOsmd.cursor.next();
+  function ptHighlightCurrentNote(color) {
+    if (!ptContainer) return;
+    // Primer, desressaltem la que estava en blau (si n'hi ha)
+    ptContainer.querySelectorAll(".pt-note-current").forEach(g => {
+      g.classList.remove("pt-note-current");
+      g.querySelectorAll("path, ellipse").forEach(el => {
+        if (el.dataset.ptOrigFill !== undefined) {
+          el.setAttribute("fill", el.dataset.ptOrigFill);
+        }
+      });
+    });
+    // Ara busquem l'element de la nota actual segons ptActiveStaff + ptTrackIdx
+    const attr = ptActiveStaff === 0 ? "data-pt-sol" : "data-pt-fa";
+    const target = ptContainer.querySelector("[" + attr + "=\"" + ptTrackIdx + "\"]");
+    if (!target) return;
+    target.classList.add("pt-note-current");
+    // Pintem totes les paths/ellipses dins el <g> de la nota de color
+    target.querySelectorAll("path, ellipse").forEach(el => {
+      if (el.dataset.ptOrigFill === undefined) {
+        el.dataset.ptOrigFill = el.getAttribute("fill") || "#000000";
       }
-    } catch (e) { /* no fatal */ }
-    ptColorCurrentNote();
-    ptStyleCursor();
+      el.setAttribute("fill", color);
+    });
+    // Scroll per assegurar que la nota actual sigui visible
+    try { target.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
+  }
+
+  function ptAdvanceOsmdCursor() {
+    // Ja no depenem del cursor d'OSMD (amagat). La funció queda per
+    // compatibilitat amb crides existents.
   }
 
   function ptEnterPractice() {
     if (!ptOsmd) return;
     ptPracticeOn = true;
-    try {
-      ptOsmd.cursor.show();
-      ptOsmd.cursor.reset();
-    } catch (e) {}
+    // Amaguem el cursor d'OSMD — la nota actual la ressaltem directament al SVG
+    try { ptOsmd.cursor.hide(); } catch (e) {}
     ptPianoEl.classList.remove("hidden");
     document.body.classList.add("pt-practicing");
     ptPracticeBtn.classList.add("is-active");
     ptPracticeBtn.textContent = "⏸ Aturar";
     ptRefreshTrack();
+    // Si encara no hem etiquetat les notes SVG, ho fem ara
+    ptLabelSVGNotes();
     ptDisplayCurrent();
-    // Pinta la primera nota en blau i estilitza el cursor amb background blau
-    ptColorCurrentNote();
-    ptStyleCursor();
+    // Pinta la primera nota en blau
+    ptHighlightCurrentNote(PT_BLUE);
   }
 
   function ptExitPractice() {
     ptPracticeOn = false;
-    ptResetNoteColors();
+    ptResetAllSVGNoteColors();
     try { ptOsmd && ptOsmd.cursor && ptOsmd.cursor.hide(); } catch (e) {}
     ptPianoEl.classList.add("hidden");
     document.body.classList.remove("pt-practicing");
@@ -3945,18 +3971,19 @@
       setTimeout(() => btn.classList.remove("correct-flash"), 200);
 
       if (ptPressedInCurrent.size >= expected.size) {
-        // Acord complet → avança
+        // Acord complet → avança + pinta la nova nota actual en blau
         ptTrackIdx++;
         ptPressedInCurrent = new Set();
-        ptAdvanceOsmdCursor();
 
         if (ptTrackIdx >= ptTrack.length) {
           ptFeedbackEl.textContent = "🎉 Felicitats, partitura completa!";
           ptFeedbackEl.className = "feedback correct";
           playCongratulations && playCongratulations();
           spawnConfetti && spawnConfetti({ count: 120 });
+          ptResetAllSVGNoteColors();
         } else {
           ptDisplayCurrent();
+          ptHighlightCurrentNote(PT_BLUE);
         }
       } else {
         // Falten notes per completar l'acord
@@ -3977,6 +4004,10 @@
       ptFeedbackEl.textContent = "✖ Era " + correctName;
       ptFeedbackEl.className = "feedback wrong";
       setTimeout(() => btn.classList.remove("wrong-flash"), 200);
+      // Flash roig sobre la nota del pentagrama perquè l'usuari vegi on s'ha
+      // equivocat, i després torna al blau.
+      ptHighlightCurrentNote(PT_RED);
+      setTimeout(() => { if (ptPracticeOn) ptHighlightCurrentNote(PT_BLUE); }, 700);
     }
   }
 
