@@ -3434,7 +3434,10 @@
   huSpeedSelect.addEventListener("change", () => {
     const v = parseInt(huSpeedSelect.value, 10);
     if (!isNaN(v) && v >= 1 && v <= SP_MAX_SPEED) huCurrentSpeed = v;
-    // Si estàvem jugant, qualsevol canvi reinicia (coherent amb la resta)
+    // Si l'estat és levelup/won, el canvi ha vingut del huLevelUp/huWin programàtic
+    // — no reiniciem la partida (deixaríem penjat el timer que torna a 'playing').
+    if (huState === "levelup" || huState === "won") return;
+    // Si estàvem jugant per l'usuari, qualsevol canvi reinicia (coherent amb la resta)
     if (huState !== "idle") huSetTarget(huTarget);
   });
 
