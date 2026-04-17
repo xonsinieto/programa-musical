@@ -3868,9 +3868,12 @@
   // només "Do" amb accidental si cal)
   const PT_CA_NAMES_SHORT = { C: "Do", D: "Re", E: "Mi", F: "Fa", G: "Sol", A: "La", B: "Si" };
 
-  // Etiquetem TOTES les notes del DOM (voice 1 + voice 2). ptTrack ara també
-  // inclou totes les veus ordenades per (measure, time, voice), així que els
-  // índexs s'alineen amb l'ordre DOM.
+  // Etiquetem TOTES les notes del DOM EXCEPTE els silencis. A OSMD els silencis
+  // també surten com `.vf-stavenote` (mateixa classe!) però tenen una forma
+  // característica: alts i estrets (h > w), mentre que les noteheads són
+  // amples i curtes (w > h). Aquest heurístic funciona bé per corxeres,
+  // semicorxeres i negres. Així els índexs DOM s'alineen amb els events del
+  // parser (que exclou rests).
   function ptLabelSVGNotes() {
     if (!ptContainer) return;
     const stafflines = ptContainer.querySelectorAll("svg g.staffline");
@@ -3881,6 +3884,14 @@
       const attr = isTreble ? "data-pt-sol" : "data-pt-fa";
       const notes = sl.querySelectorAll("g.vf-stavenote");
       notes.forEach(noteEl => {
+        // Detecció de silenci per bbox: els silencis són més alts que amples.
+        // Noteheads (blanques, negres, rodones...) són ~oval: width > height.
+        let isRest = false;
+        try {
+          const bb = noteEl.getBBox();
+          if (bb && bb.height > bb.width * 1.15) isRest = true;
+        } catch (e) {}
+        if (isRest) return; // saltem silencis — no els etiquetem
         noteEl.setAttribute(attr, isTreble ? iSol++ : iFa++);
       });
     });
@@ -3915,7 +3926,8 @@
       }
       el.setAttribute("fill", PT_RED);
     });
-    // Afegeix text amb el nom al damunt de la nota
+    // Afegeix text amb el nom al damunt de la nota — BEN gran i visible perquè
+    // l'usuari pugui repassar d'un cop d'ull els errors.
     try {
       const bbox = target.getBBox ? target.getBBox() : null;
       const svg = target.closest("svg");
@@ -3923,12 +3935,15 @@
         const ns = "http://www.w3.org/2000/svg";
         const t = document.createElementNS(ns, "text");
         t.setAttribute("x", bbox.x + bbox.width / 2);
-        t.setAttribute("y", bbox.y - 3);
+        t.setAttribute("y", bbox.y - 6);
         t.setAttribute("text-anchor", "middle");
-        t.setAttribute("font-size", "7");
-        t.setAttribute("font-weight", "700");
+        t.setAttribute("font-size", "14");
+        t.setAttribute("font-weight", "900");
         t.setAttribute("fill", PT_RED);
-        t.setAttribute("font-family", "sans-serif");
+        t.setAttribute("stroke", "#FFFFFF");
+        t.setAttribute("stroke-width", "0.5");
+        t.setAttribute("paint-order", "stroke");
+        t.setAttribute("font-family", "'Outfit', sans-serif");
         t.setAttribute("class", "pt-fail-label");
         t.textContent = correctName;
         svg.appendChild(t);

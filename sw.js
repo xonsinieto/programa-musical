@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v58-all-voices-red-fails";
+const CACHE = "lectura-notes-v59-rests-filtered";
 const FILES = [
   "./",
   "./index.html",
