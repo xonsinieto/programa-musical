@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v45-hide-adjust";
+const CACHE = "lectura-notes-v46-children";
 const FILES = [
   "./",
   "./index.html",
@@ -9,7 +9,8 @@ const FILES = [
   "./icon-192.png",
   "./icon-512.png",
   "./partitures/index.json",
-  "./partitures/poem-without-words-2.mxl"
+  "./partitures/poem-without-words-2.mxl",
+  "./partitures/children-robert-miles.mxl"
 ];
 
 self.addEventListener("install", (event) => {

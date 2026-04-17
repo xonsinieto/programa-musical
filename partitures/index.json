@@ -8,5 +8,15 @@
     "keySignature": "Do major",
     "measures": 99,
     "difficulty": "intermedi"
+  },
+  {
+    "id": "children-robert-miles",
+    "name": "Children (Easy Piano)",
+    "author": "Robert Miles",
+    "file": "children-robert-miles.mxl",
+    "timeSignature": "4/4",
+    "keySignature": "Lab major (4♭)",
+    "measures": 76,
+    "difficulty": "fàcil"
   }
 ]
