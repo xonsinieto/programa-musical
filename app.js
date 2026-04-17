@@ -3447,12 +3447,10 @@
   const ptCopyBtn      = document.getElementById("pt-copy-btn");
   const ptResetBtn     = document.getElementById("pt-reset-btn");
   const ptPracticeBtn  = document.getElementById("pt-practice-btn");
-  const ptReadToolbar  = document.getElementById("pt-read-toolbar");
-  const ptReadCurrentEl = document.getElementById("pt-read-current");
-  const ptNavPrev      = document.getElementById("pt-nav-prev");
-  const ptNavNext      = document.getElementById("pt-nav-next");
-  const ptExitBtn      = document.getElementById("pt-exit-btn");
+  const ptAnswerWrap   = document.getElementById("pt-answer-buttons");
+  const ptFeedbackEl   = document.getElementById("pt-feedback");
   const ptClefBtns     = document.querySelectorAll(".pt-clef-btn");
+  const ptNoteBtns     = document.querySelectorAll(".pt-note-btn");
   let ptPracticeOn = false;
   let ptActiveStaff = 0; // 0 = Sol (treble), 1 = Fa (bass)
   const PT_CFG_KEY     = "ptSpaceConfig_v1";
@@ -3772,18 +3770,7 @@
     } catch (e) { return "?"; }
   }
 
-  function ptUpdateReadDisplay() {
-    const notes = ptActiveNotesAtCursor();
-    if (!notes.length) {
-      ptReadCurrentEl.textContent = "Toca: —";
-      return;
-    }
-    const names = notes.map(ptFormatNoteName);
-    ptReadCurrentEl.textContent = "Toca: " + names.join(" + ");
-  }
-
-  // Avança fins a una posició que tingui notes a la clau activa (salta silencis
-  // i posicions sense notes per la clau que practiques). Safety: 500 passos.
+  // Avança fins a una posició que tingui notes a la clau activa (salta silencis).
   function ptSkipToActive() {
     if (!ptOsmd || !ptOsmd.cursor) return;
     let steps = 0;
@@ -3794,6 +3781,28 @@
     }
   }
 
+  // Retorna el nom CATALÀ (minúscula: 'do/re/mi/fa/sol/la/si') de la nota esperada
+  // actual. Si hi ha un acord, agafem la nota SUPERIOR (la més aguda) com a objectiu
+  // principal — la majoria d'usuaris identifiquen l'acord per la melodia superior.
+  function ptExpectedCaName() {
+    const active = ptActiveNotesAtCursor();
+    if (!active.length) return null;
+    // Ordena per pitch descendent (tria la més aguda)
+    active.sort((a, b) => {
+      const pa = (a.Pitch && (a.Pitch.Octave * 7 + a.Pitch.FundamentalNote)) || 0;
+      const pb = (b.Pitch && (b.Pitch.Octave * 7 + b.Pitch.FundamentalNote)) || 0;
+      return pb - pa;
+    });
+    const top = active[0];
+    try {
+      const step = (typeof top.Pitch.FundamentalNote === "number")
+        ? top.Pitch.FundamentalNote : top.Pitch.fundamentalNote;
+      // Català MINÚSCULA perquè coincideixi amb els data-note dels botons.
+      const caMap = ["do", "re", "mi", "fa", "sol", "la", "si"];
+      return caMap[step] || null;
+    } catch (e) { return null; }
+  }
+
   function ptEnterPractice() {
     if (!ptOsmd) return;
     ptPracticeOn = true;
@@ -3801,31 +3810,21 @@
       ptOsmd.cursor.show();
       ptOsmd.cursor.reset();
     } catch (e) {}
-    ptReadToolbar.classList.remove("hidden");
+    ptAnswerWrap.classList.remove("hidden");
     ptPracticeBtn.classList.add("is-active");
+    ptPracticeBtn.textContent = "⏸ Aturar";
+    ptFeedbackEl.textContent = "Toca la nota que ressalta el cursor a la partitura.";
+    ptFeedbackEl.className = "feedback";
     ptSkipToActive();
-    ptUpdateReadDisplay();
   }
 
   function ptExitPractice() {
     ptPracticeOn = false;
     try { ptOsmd && ptOsmd.cursor && ptOsmd.cursor.hide(); } catch (e) {}
-    ptReadToolbar.classList.add("hidden");
+    ptAnswerWrap.classList.add("hidden");
     ptPracticeBtn.classList.remove("is-active");
-  }
-
-  function ptNavNextNote() {
-    if (!ptOsmd || !ptOsmd.cursor) return;
-    ptOsmd.cursor.next();
-    ptSkipToActive();
-    ptUpdateReadDisplay();
-  }
-
-  function ptNavPrevNote() {
-    if (!ptOsmd || !ptOsmd.cursor) return;
-    try { ptOsmd.cursor.previous(); } catch (e) {}
-    // No fem skip-to-active enrere per simplicitat; l'usuari pot tornar a avançar.
-    ptUpdateReadDisplay();
+    ptPracticeBtn.textContent = "▶ Practicar";
+    ptFeedbackEl.textContent = "";
   }
 
   function ptSetClef(staffIdx) {
@@ -3834,8 +3833,47 @@
       b.classList.toggle("is-active", parseInt(b.dataset.staff, 10) === staffIdx);
     });
     if (ptPracticeOn) {
+      try { ptOsmd.cursor.reset(); } catch (e) {}
       ptSkipToActive();
-      ptUpdateReadDisplay();
+    }
+  }
+
+  // Gestió de la resposta de l'usuari quan clica un botó Do/Re/Mi/...
+  function ptHandleAnswer(answerCa, btn) {
+    if (!ptPracticeOn) return;
+    const expected = ptExpectedCaName();
+    if (!expected) {
+      // Fi de la partitura
+      ptFeedbackEl.textContent = "🎉 Has arribat al final!";
+      ptFeedbackEl.className = "feedback correct";
+      return;
+    }
+    if (answerCa === expected) {
+      // Encertada → cursor avança + flash verd al botó
+      btn.classList.add("correct-flash");
+      ptFeedbackEl.textContent = "✔ " + expected.toUpperCase();
+      ptFeedbackEl.className = "feedback correct";
+      playNote(expected === "do" ? "c/4" : expected === "re" ? "d/4" :
+               expected === "mi" ? "e/4" : expected === "fa" ? "f/4" :
+               expected === "sol" ? "g/4" : expected === "la" ? "a/4" : "b/4");
+      setTimeout(() => btn.classList.remove("correct-flash"), 200);
+      // Avança al següent
+      try { ptOsmd.cursor.next(); } catch (e) {}
+      ptSkipToActive();
+      // Ha arribat al final?
+      if (ptOsmd.cursor.iterator.EndReached) {
+        ptFeedbackEl.textContent = "🎉 Felicitats, partitura completa!";
+        playCongratulations && playCongratulations();
+        spawnConfetti && spawnConfetti({ count: 120 });
+      }
+    } else {
+      // Errada → flash vermell, no avança, mostra què era
+      btn.classList.add("wrong-flash");
+      playErrorSound && playErrorSound();
+      shakeElement && shakeElement(ptContainer);
+      ptFeedbackEl.textContent = "✖ Era " + expected.toUpperCase();
+      ptFeedbackEl.className = "feedback wrong";
+      setTimeout(() => btn.classList.remove("wrong-flash"), 200);
     }
   }
 
@@ -3847,11 +3885,11 @@
       if (ptPracticeOn) ptExitPractice();
       else ptEnterPractice();
     });
-    if (ptExitBtn) ptExitBtn.addEventListener("click", ptExitPractice);
-    if (ptNavPrev) ptNavPrev.addEventListener("click", ptNavPrevNote);
-    if (ptNavNext) ptNavNext.addEventListener("click", ptNavNextNote);
     ptClefBtns.forEach(b => {
       b.addEventListener("click", () => ptSetClef(parseInt(b.dataset.staff, 10)));
+    });
+    ptNoteBtns.forEach(b => {
+      b.addEventListener("click", () => ptHandleAnswer(b.dataset.note, b));
     });
   }
 

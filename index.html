@@ -501,23 +501,18 @@
           <select id="pt-select"></select>
         </label>
         <button id="pt-adjust-btn" type="button" title="Ajustar espai i mida" hidden style="display:none">⚙ Ajustar</button>
+        <label class="pt-clef-inline">
+          Clau:
+          <span class="pt-clef-toggle">
+            <button class="pt-clef-btn is-active" data-staff="0" title="Clau de Sol">Sol</button>
+            <button class="pt-clef-btn" data-staff="1" title="Clau de Fa">Fa</button>
+          </span>
+        </label>
         <button id="pt-practice-btn" type="button" title="Entrar en mode lectura">▶ Practicar</button>
       </div>
 
-      <!-- Barra de lectura: apareix quan entres en mode practicar -->
-      <div id="pt-read-toolbar" class="pt-read-toolbar hidden">
-        <div class="pt-read-group">
-          <span class="pt-read-label">Practico:</span>
-          <button class="pt-clef-btn is-active" data-staff="0" title="Clau de Sol">Sol</button>
-          <button class="pt-clef-btn" data-staff="1" title="Clau de Fa">Fa</button>
-        </div>
-        <div class="pt-read-group">
-          <button id="pt-nav-prev" class="pt-nav-btn" title="Nota anterior">◄</button>
-          <button id="pt-nav-next" class="pt-nav-btn" title="Nota següent">►</button>
-        </div>
-        <div class="pt-read-current" id="pt-read-current">Toca: —</div>
-        <button id="pt-exit-btn" class="pt-exit-btn" title="Sortir del mode lectura">✕</button>
-      </div>
+      <!-- Feedback breu quan encertes/erres (apareix al costat dels botons de nota) -->
+      <div id="pt-feedback" class="feedback"></div>
 
       <!-- Panell d'ajust amb sliders. Canvis aplicats en temps real amb debounce. -->
       <div id="pt-adjust-panel" class="pt-adjust-panel hidden">
@@ -554,6 +549,17 @@
 
       <div id="pt-info" class="pt-info"></div>
       <div id="pt-staff-container"></div>
+
+      <!-- Botons de resposta: apareixen només en mode practicar -->
+      <div id="pt-answer-buttons" class="answer-buttons pt-answer-buttons hidden">
+        <button class="note-btn pt-note-btn" data-note="do">Do</button>
+        <button class="note-btn pt-note-btn" data-note="re">Re</button>
+        <button class="note-btn pt-note-btn" data-note="mi">Mi</button>
+        <button class="note-btn pt-note-btn" data-note="fa">Fa</button>
+        <button class="note-btn pt-note-btn" data-note="sol">Sol</button>
+        <button class="note-btn pt-note-btn" data-note="la">La</button>
+        <button class="note-btn pt-note-btn" data-note="si">Si</button>
+      </div>
     </section>
   </main>
 

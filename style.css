@@ -2572,109 +2572,41 @@ main {
   box-shadow: 0 4px 14px rgba(255, 184, 0, 0.4);
 }
 
-/* Barra superior del mode lectura */
-.pt-read-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 10px 18px;
-  padding: 10px 14px;
-  margin: 0 auto 10px;
-  max-width: 900px;
-  background: rgba(18, 22, 45, 0.85);
-  border: 1px solid rgba(0, 240, 255, 0.3);
-  border-radius: 14px;
-  backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 40px rgba(0, 240, 255, 0.1);
-}
-.pt-read-toolbar.hidden { display: none; }
-.pt-read-group { display: inline-flex; align-items: center; gap: 6px; }
-.pt-read-label {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: rgba(232, 236, 241, 0.65);
+/* Toggle Sol|Fa inline dins dels .controls de Partitures */
+.pt-clef-inline { display: inline-flex; align-items: center; gap: 6px; }
+.pt-clef-toggle {
+  display: inline-flex;
+  gap: 3px;
+  padding: 2px;
+  background: rgba(5, 7, 15, 0.5);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
 }
 .pt-clef-btn {
-  padding: 7px 14px;
-  border: 1px solid var(--glass-border);
-  background: rgba(5, 7, 15, 0.6);
+  padding: 5px 12px;
+  border: none;
+  background: transparent;
   color: var(--ink);
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 0.85rem;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 180ms ease;
-}
-.pt-clef-btn:hover { border-color: rgba(0, 240, 255, 0.5); }
-.pt-clef-btn.is-active {
-  background: linear-gradient(135deg, var(--primary), var(--accent));
-  color: #05070F;
-  border-color: transparent;
-  box-shadow: 0 4px 12px rgba(0, 240, 255, 0.35);
-}
-.pt-nav-btn {
-  padding: 6px 14px;
-  border: 1px solid var(--glass-border);
-  background: rgba(5, 7, 15, 0.6);
-  color: var(--primary);
-  font-size: 1rem;
-  font-weight: 700;
-  border-radius: 8px;
+  font-size: 0.78rem;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 140ms ease;
 }
-.pt-nav-btn:hover { background: rgba(0, 240, 255, 0.12); }
-.pt-read-current {
-  font-family: var(--font-mono);
-  font-size: 0.92rem;
-  color: var(--ink);
-  letter-spacing: 0.04em;
-  padding: 6px 14px;
-  background: rgba(0, 240, 255, 0.1);
-  border: 1px solid rgba(0, 240, 255, 0.35);
-  border-radius: 999px;
-  min-width: 180px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-.pt-exit-btn {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid rgba(255, 51, 102, 0.4);
-  background: rgba(255, 51, 102, 0.12);
-  color: var(--error);
-  font-size: 1rem;
-  font-weight: 700;
-  border-radius: 50%;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.pt-exit-btn:hover {
-  background: rgba(255, 51, 102, 0.25);
-  transform: rotate(90deg);
-  transition: transform 200ms ease;
+.pt-clef-btn:hover { background: rgba(0, 240, 255, 0.1); }
+.pt-clef-btn.is-active {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: #05070F;
+  box-shadow: 0 2px 8px rgba(0, 240, 255, 0.3);
 }
 
+/* Botons de resposta a Partitures — apareixen en mode practicar */
+.pt-answer-buttons { margin-top: 8px; }
+.pt-answer-buttons.hidden { display: none; }
+
 @media (max-width: 600px) {
-  .pt-read-toolbar {
-    padding: 7px 10px;
-    gap: 6px 10px;
-    margin: 0 3px 8px;
-    border-radius: 10px;
-  }
-  .pt-read-label { font-size: 0.6rem; letter-spacing: 0.06em; }
-  .pt-clef-btn { padding: 5px 10px; font-size: 0.72rem; }
-  .pt-nav-btn { padding: 4px 10px; font-size: 0.85rem; }
-  .pt-read-current { font-size: 0.75rem; padding: 4px 10px; min-width: 130px; }
-  .pt-exit-btn { width: 26px; height: 26px; font-size: 0.85rem; }
+  .pt-clef-btn { padding: 4px 10px; font-size: 0.7rem; }
 }
 
 /* Panell d'ajust — permet a l'usuari afinar espai/títol en temps real */
