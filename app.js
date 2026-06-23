@@ -487,7 +487,7 @@
   const correctCountEl = document.getElementById("correct-count");
   const wrongCountEl   = document.getElementById("wrong-count");
   const accuracyEl     = document.getElementById("accuracy");
-  const noteButtons    = document.querySelectorAll("#screen-train .note-btn");
+  const trainPiano     = document.getElementById("train-piano");
 
   let sequence    = [];   // [{ clef, note, status: "pending"|"correct"|"wrong" }]
   let currentStep = 0;
@@ -749,7 +749,10 @@
   function advance() {
     currentStep++;
     answered = false;
-    noteButtons.forEach(b => b.classList.remove("correct-flash","wrong-flash"));
+    if (trainPiano) {
+      trainPiano.querySelectorAll(".nk-key").forEach(b =>
+        b.classList.remove("correct-flash", "wrong-flash"));
+    }
     if (currentStep >= sequence.length) {
       const elapsed = endRoundTimer();
       let message = "Seqüència completada!";
@@ -789,7 +792,7 @@
     }
   }
 
-  function handleAnswer(answerCa, btn) {
+  function handleAnswer(answerPitch, btn) {
     if (answered || currentStep >= sequence.length) return;
     answered = true;
 
@@ -800,7 +803,8 @@
     const correctLetter = noteLetter(step.note);
     const correctCa     = NOTE_NAMES_CA[correctLetter];
 
-    if (answerCa === correctCa) {
+    // Resposta correcta = tecla EXACTA (mateixa nota i octava)
+    if (answerPitch === step.note) {
       correct++;
       step.status = "correct";
       feedbackEl.textContent = "Correcte!";
@@ -820,7 +824,10 @@
       feedbackEl.className   = "feedback wrong";
       popFeedback(feedbackEl);
       shakeElement(staffContainer);
-      btn.classList.add("wrong-flash");
+      if (btn) btn.classList.add("wrong-flash");
+      // Ressalta la tecla correcta perquè l'alumne vegi on era
+      const correctKey = trainPiano.querySelector('[data-pitch="' + step.note + '"]');
+      if (correctKey) correctKey.classList.add("correct-flash");
       playErrorSound();
       recordTrainAnswer(step.clef, step.note, false);
       render();
@@ -831,12 +838,91 @@
     tickCounter(wrongCountEl);
   }
 
+  // ---------- TECLAT DE RESPOSTA DINÀMIC ----------
+  // El piano de resposta s'adapta al rang del nivell: bàsic 1 octava,
+  // intermedi 2 octaves, avançat tot el piano. Resposta per tecla EXACTA.
+  const PITCH_SEMI = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
+  const SEMI_PITCH = { 0: "c", 2: "d", 4: "e", 5: "f", 7: "g", 9: "a", 11: "b" };
+  function pitchToMidi(p) {
+    const parts = p.split("/");
+    return (parseInt(parts[1], 10) + 1) * 12 + PITCH_SEMI[parts[0].toLowerCase()];
+  }
+  // Totes les notes naturals del piano (la/0 → do/8), ascendent
+  const ALL_NATURAL_PITCHES = (function () {
+    const out = [];
+    for (let m = pitchToMidi("a/0"); m <= pitchToMidi("c/8"); m++) {
+      const semi = ((m % 12) + 12) % 12;
+      if (SEMI_PITCH[semi] !== undefined) {
+        out.push(SEMI_PITCH[semi] + "/" + (Math.floor(m / 12) - 1));
+      }
+    }
+    return out;
+  })();
+
+  // Rang de tecles blanques segons nivell + clau (i notes reals de la seqüència)
+  function keyboardRangePitches() {
+    const lvl  = parseInt(levelSelect.value, 10) || 3;
+    const clef = clefSelect.value;
+    const pool = [];
+    if (modeSelect.value !== "song") {
+      const addClef = (c) => {
+        const arr = (lvl === 3 || !LEVELS[lvl]) ? RANGES[c] : LEVELS[lvl][c];
+        pool.push.apply(pool, arr);
+      };
+      if (clef === "both") { addClef("treble"); addClef("bass"); }
+      else addClef(clef);
+    }
+    // Cançons i "fallades" poden sortir-se del rang del nivell → inclou-les sempre
+    sequence.forEach((s) => pool.push(s.note));
+    if (!pool.length) pool.push("c/4", "c/5");
+    const midis = pool.map(pitchToMidi);
+    const minM = Math.min.apply(null, midis);
+    const maxM = Math.max.apply(null, midis);
+    return ALL_NATURAL_PITCHES.filter((p) => {
+      const m = pitchToMidi(p);
+      return m >= minM && m <= maxM;
+    });
+  }
+
+  function renderAnswerKeyboard() {
+    if (!trainPiano) return;
+    const whites = keyboardRangePitches();
+    const N = whites.length;
+    const blackPct = 62 / N;   // amplada relativa de la tecla negra
+    let html = "";
+    // Tecles blanques (botons de resposta)
+    whites.forEach((p) => {
+      const ca = NOTE_NAMES_CA[noteLetter(p)] || "";
+      const label = ca.charAt(0).toUpperCase() + ca.slice(1);
+      html += '<button class="note-btn nk-key" data-pitch="' + p +
+              '" data-note="' + ca + '">' + label + '</button>';
+    });
+    // Tecles negres decoratives (entre naturals consecutives, excepte Mi-Fa i Si-Do)
+    whites.forEach((p, i) => {
+      if (i >= N - 1) return;
+      const l = noteLetter(p);
+      if (l === "c" || l === "d" || l === "f" || l === "g" || l === "a") {
+        const leftPct = ((i + 1) * 100) / N - blackPct / 2;
+        html += '<span class="nk-blk" style="left:' + leftPct.toFixed(3) +
+                '%;width:' + blackPct.toFixed(3) + '%" aria-hidden="true"></span>';
+      }
+    });
+    trainPiano.innerHTML = html;
+    // Centra la vista sobre el Do central com a referència neutra (no revela la resposta)
+    const scroll = trainPiano.parentElement;
+    if (scroll && scroll.scrollWidth > scroll.clientWidth) {
+      const ref = trainPiano.querySelector('[data-pitch="c/4"]') ||
+                  trainPiano.querySelector(".nk-key");
+      if (ref) scroll.scrollLeft = ref.offsetLeft - scroll.clientWidth / 2 + ref.offsetWidth / 2;
+    }
+  }
+
   function startRound() {
     buildSequence();
+    renderAnswerKeyboard();
     answered = false;
     feedbackEl.textContent = "";
     feedbackEl.className   = "feedback";
-    noteButtons.forEach(b => b.classList.remove("correct-flash","wrong-flash"));
     roundStartMs = 0;
     roundEndedMs = 0;
     roundErrors  = 0;
@@ -846,8 +932,10 @@
     render();
   }
 
-  noteButtons.forEach(btn => {
-    btn.addEventListener("click", () => handleAnswer(btn.dataset.note, btn));
+  // Delegació: les tecles es regeneren a cada canvi de nivell/clau/mode
+  trainPiano.addEventListener("click", (e) => {
+    const key = e.target.closest(".nk-key");
+    if (key && trainPiano.contains(key)) handleAnswer(key.dataset.pitch, key);
   });
 
   // ---------- CÀRREGA MUSICXML ----------
@@ -1165,7 +1253,16 @@
               micLastMatchAt = now;
               micSilenceFramesSinceMatch = 0;
               micHistory = [];
-              const btn = document.querySelector('#screen-train .note-btn[data-note="' + bestNote + '"]');
+              // Si el nom detectat coincideix amb la nota actual, clica la tecla
+              // exacta (octava correcta); si no, la primera tecla amb aquell nom.
+              let btn = null;
+              if (currentStep < sequence.length) {
+                const cur = sequence[currentStep];
+                if (NOTE_NAMES_CA[noteLetter(cur.note)] === bestNote) {
+                  btn = trainPiano.querySelector('[data-pitch="' + cur.note + '"]');
+                }
+              }
+              if (!btn) btn = trainPiano.querySelector('.nk-key[data-note="' + bestNote + '"]');
               if (btn) btn.click();
             }
           }

@@ -1798,12 +1798,23 @@ main {
   margin-bottom: 20px;
 }
 
-/* Cos del piano: contenidor relatiu on les blanques omplen i les
-   negres es munten a sobre en absolut (com un teclat real). */
+/* Embolcall amb scroll horitzontal: quan el teclat (avançat / tot el piano)
+   és més ample que la pantalla, es pot arrossegar lateralment. */
+.nk-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0 8px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+/* Cos del piano: contenidor relatiu on les blanques s'alineen i les
+   negres es munten a sobre en absolut (com un teclat real).
+   width:max-content perquè creixi amb el nombre de tecles. */
 .nk-piano {
   position: relative;
-  width: 100%;
-  max-width: 520px;
+  width: max-content;
+  max-width: none;
   height: 210px;
   margin: 0 auto;
   display: flex;
@@ -1815,7 +1826,8 @@ main {
 .nk-key {
   position: relative;
   z-index: 1;
-  flex: 1 1 0;
+  flex: 0 0 auto;
+  width: 58px;
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -1876,8 +1888,8 @@ main {
 }
 
 @media (max-width: 600px) {
-  .nk-piano { height: 165px; max-width: 100%; }
-  .nk-key { font-size: 0.92rem; padding-bottom: 10px; }
+  .nk-piano { height: 165px; }
+  .nk-key { width: 46px; font-size: 0.92rem; padding-bottom: 10px; }
 }
 
 .stats {
