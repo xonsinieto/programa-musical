@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v69-piano-aligned-staff";
+const CACHE = "lectura-notes-v70-yin-speech";
 const FILES = [
   "./",
   "./index.html",

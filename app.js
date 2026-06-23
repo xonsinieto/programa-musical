@@ -1100,241 +1100,223 @@
   let micStream   = null;
   let micCtx      = null;
   let micAnalyser = null;
-  let micDetector = null;
   let micRAF      = null;
   let micBuffer   = null;
   let micLastMatchAt = 0;
-  let micHistory     = []; // últimes N deteccions de nota
-  let micSilenceFramesSinceMatch = 999; // frames de silenci comptats des de l'últim match
 
   const NOTE_CLASS_BY_SEMITONE = {
     0: "do",  2: "re",  4: "mi",  5: "fa",  7: "sol", 9: "la", 11: "si"
   };
   const NATURAL_SEMITONES = [0, 2, 4, 5, 7, 9, 11];
 
-  // Detecció de pitch per autocorrelació inline (sense CDN).
-  // Retorna [freq_Hz, clarity_0_1].
-  function autoCorrelatePitch(buffer, sampleRate) {
-    const SIZE = buffer.length;
-    // RMS
-    let rms = 0;
-    for (let i = 0; i < SIZE; i++) rms += buffer[i] * buffer[i];
-    rms = Math.sqrt(rms / SIZE);
-    if (rms < 0.005) return [0, 0];
+  // ── YIN pitch detection ────────────────────────────────────────────────────
+  // Algorisme professional (Audacity, Melodyne). Molt millor que autocorrelació
+  // per veu humana: detecta el to fonamental fins i tot amb harmònics complexos.
+  // Retorna [freq_Hz, confiança_0_1]. Confiança >0.5 ja és fiable per veu.
+  function yinPitch(buffer, sampleRate) {
+    const N = buffer.length;
+    const W = Math.floor(N / 2);
+    const THRESH = 0.12;
 
-    // Retalla silenci a inici/fi
-    const thresh = 0.02;
-    let r1 = 0, r2 = SIZE - 1;
-    for (let i = 0; i < SIZE / 2; i++) {
-      if (Math.abs(buffer[i]) >= thresh) { r1 = i; break; }
+    const diff = new Float32Array(W);
+    for (let tau = 1; tau < W; tau++) {
+      let s = 0;
+      for (let i = 0; i < W; i++) { const d = buffer[i] - buffer[i + tau]; s += d * d; }
+      diff[tau] = s;
     }
-    for (let i = 1; i < SIZE / 2; i++) {
-      if (Math.abs(buffer[SIZE - i]) >= thresh) { r2 = SIZE - i; break; }
+
+    const cmndf = new Float32Array(W);
+    cmndf[0] = 1;
+    let run = 0;
+    for (let tau = 1; tau < W; tau++) {
+      run += diff[tau];
+      cmndf[tau] = run > 0 ? diff[tau] * tau / run : 1;
     }
-    const trimStart = r1;
-    const trimEnd   = r2;
-    const n = trimEnd - trimStart;
-    if (n < 100) return [0, 0];
 
-    // Autocorrelació
-    const minFreq = 70;
-    const maxFreq = 1200;
-    const maxLag = Math.min(n - 1, Math.floor(sampleRate / minFreq));
-    const minLag = Math.floor(sampleRate / maxFreq);
-
-    // Energia de referència (lag 0)
-    let c0 = 0;
-    for (let i = trimStart; i < trimEnd; i++) c0 += buffer[i] * buffer[i];
-    if (c0 < 1e-6) return [0, 0];
-
-    let bestLag = 0;
-    let bestCorr = -1;
-    for (let lag = minLag; lag <= maxLag; lag++) {
-      let c = 0;
-      const end = trimEnd - lag;
-      for (let i = trimStart; i < end; i++) {
-        c += buffer[i] * buffer[i + lag];
+    const tauMin = Math.floor(sampleRate / 1400);
+    const tauMax = Math.min(W - 1, Math.floor(sampleRate / 48));
+    let tau = Math.max(2, tauMin);
+    while (tau < tauMax) {
+      if (cmndf[tau] < THRESH) {
+        while (tau + 1 < tauMax && cmndf[tau + 1] < cmndf[tau]) tau++;
+        break;
       }
-      const normalized = c / c0;
-      if (normalized > bestCorr) {
-        bestCorr = normalized;
-        bestLag = lag;
-      }
+      tau++;
     }
-    if (bestLag < minLag) return [0, 0];
+    if (tau >= tauMax) return [0, 0];
 
-    // Interpolació parabòlica per precisió sub-mostra
-    let refinedLag = bestLag;
-    if (bestLag > minLag && bestLag < maxLag) {
-      const lm1 = bestLag - 1, lp1 = bestLag + 1;
-      let cm = 0, cp = 0;
-      for (let i = trimStart; i < trimEnd - lm1; i++) cm += buffer[i] * buffer[i + lm1];
-      for (let i = trimStart; i < trimEnd - lp1; i++) cp += buffer[i] * buffer[i + lp1];
-      const cb = bestCorr * c0;
-      const denom = cm - 2 * cb + cp;
-      if (Math.abs(denom) > 1e-9) {
-        const delta = 0.5 * (cm - cp) / denom;
-        refinedLag = bestLag + delta;
-      }
+    let t = tau;
+    if (tau > 1 && tau < W - 1) {
+      const x0 = cmndf[tau-1], x1 = cmndf[tau], x2 = cmndf[tau+1];
+      const den = x0 - 2*x1 + x2;
+      if (Math.abs(den) > 1e-9) t = tau + 0.5*(x0-x2)/den;
     }
-
-    const freq = sampleRate / refinedLag;
-    return [freq, Math.max(0, bestCorr)];
+    return [sampleRate / t, 1 - cmndf[tau]];
   }
 
-  // Wrapper per compatibilitat amb la crida micDetector.findPitch(buffer, sampleRate)
-  const micDetectorObj = { findPitch: autoCorrelatePitch };
-
   function freqToNoteCa(freq) {
-    // MIDI (continu) a partir de freq: A4=69
     const midi = 12 * Math.log2(freq / 440) + 69;
-    const semi = ((midi % 12) + 12) % 12; // 0 .. 12
-    // Trobem la nota natural més propera (distància circular en semitons)
-    let bestSemi = 0;
-    let bestDist = 100;
+    const semi = ((Math.round(midi) % 12) + 12) % 12;
+    let bestSemi = 0, bestDist = 100;
     for (const n of NATURAL_SEMITONES) {
       let d = Math.abs(n - semi);
       if (d > 6) d = 12 - d;
-      if (d < bestDist) {
-        bestDist = d;
-        bestSemi = n;
-      }
+      if (d < bestDist) { bestDist = d; bestSemi = n; }
     }
-    // Acceptem fins a 0.85 semitons (~85 cents) de desviació
-    if (bestDist > 0.85) return null;
+    if (bestDist > 1.0) return null;
     return NOTE_CLASS_BY_SEMITONE[bestSemi] || null;
   }
 
+  // ── Web Speech API ─────────────────────────────────────────────────────────
+  // Reconeix el nom de la nota dit o cantat en veu alta. Funciona en Chrome,
+  // Edge i Safari sense cap instal·lació extra.
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let speechRec  = null;
+  let speechLive = false;
+
+  function matchNoteCA(text) {
+    const t = text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+    if (/\bsol\b/.test(t)) return "sol"; // primer: evita que "la" o "si" cassin "sol"
+    if (/\bsi\b/.test(t))  return "si";
+    if (/\bdo\b/.test(t))  return "do";
+    if (/\bre\b/.test(t))  return "re";
+    if (/\bmi\b/.test(t))  return "mi";
+    if (/\bfa\b/.test(t))  return "fa";
+    if (/\bla\b/.test(t))  return "la";
+    return null;
+  }
+
+  function initSpeech() {
+    if (!SpeechRec) return;
+    speechRec = new SpeechRec();
+    speechRec.lang = "ca-ES";
+    speechRec.continuous = true;
+    speechRec.interimResults = true;
+    speechRec.maxAlternatives = 3;
+    speechRec.onresult = (e) => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        for (let j = 0; j < e.results[i].length; j++) {
+          const note = matchNoteCA(e.results[i][j].transcript);
+          if (note) { triggerMicNote(note, "veu"); return; }
+        }
+      }
+    };
+    speechRec.onerror = (e) => { if (e.error !== "no-speech") console.warn("[SPEECH]", e.error); };
+    speechRec.onend   = () => { if (speechLive) { try { speechRec.start(); } catch(_) {} } };
+  }
+
+  // ── Trigger unificat ────────────────────────────────────────────────────────
+  function triggerMicNote(noteCa, mode) {
+    const now = performance.now();
+    if (now - micLastMatchAt < 700) return;
+    micLastMatchAt = now;
+    micStatus.textContent = "✓ " + noteCa.toUpperCase() + " [" + mode + "]";
+    micStatus.classList.add("detected");
+    setTimeout(() => micStatus.classList.remove("detected"), 700);
+    let btn = null;
+    if (currentStep < sequence.length) {
+      const cur = sequence[currentStep];
+      if (NOTE_NAMES_CA[noteLetter(cur.note)] === noteCa)
+        btn = trainPiano.querySelector('[data-pitch="' + cur.note + '"]');
+    }
+    if (!btn) btn = trainPiano.querySelector('.nk-key:not(.nk-inactive)[data-note="' + noteCa + '"]');
+    if (btn) btn.click();
+  }
+
+  // ── Bucle YIN ──────────────────────────────────────────────────────────────
+  let yinHistory = [];
+  const YIN_FRAMES  = 5;
+  const YIN_AGREE   = 4;
+  const YIN_CONF    = 0.50;
+  const YIN_RMS_MIN = 0.007;
+
+  function micLoop() {
+    if (!micActive || !micAnalyser) return;
+    micAnalyser.getFloatTimeDomainData(micBuffer);
+    let sumSq = 0;
+    for (let i = 0; i < micBuffer.length; i++) sumSq += micBuffer[i] * micBuffer[i];
+    const rms = Math.sqrt(sumSq / micBuffer.length);
+
+    if (rms < YIN_RMS_MIN) {
+      micStatus.textContent = "🔇";
+      micStatus.classList.remove("detected");
+      yinHistory = [];
+      micRAF = requestAnimationFrame(micLoop);
+      return;
+    }
+
+    const [freq, conf] = yinPitch(micBuffer, micCtx.sampleRate);
+    if (freq > 48 && freq < 1400 && conf > YIN_CONF) {
+      const noteCa = freqToNoteCa(freq);
+      if (noteCa) {
+        micStatus.textContent = noteCa.toUpperCase() + " " + Math.round(freq) + "Hz  c:" + conf.toFixed(2);
+        micStatus.classList.add("detected");
+        yinHistory.push(noteCa);
+        if (yinHistory.length > YIN_FRAMES) yinHistory.shift();
+        if (yinHistory.length >= YIN_FRAMES) {
+          const counts = {};
+          yinHistory.forEach(n => counts[n] = (counts[n]||0) + 1);
+          let best = null, bestC = 0;
+          for (const n in counts) { if (counts[n] > bestC) { bestC = counts[n]; best = n; } }
+          if (bestC >= YIN_AGREE) { yinHistory = []; triggerMicNote(best, "pitch"); }
+        }
+      } else {
+        micStatus.textContent = Math.round(freq) + "Hz ?  c:" + conf.toFixed(2);
+        micStatus.classList.remove("detected");
+        yinHistory = [];
+      }
+    } else {
+      micStatus.textContent = "♩ rms:" + rms.toFixed(3);
+      micStatus.classList.remove("detected");
+      yinHistory = [];
+    }
+    micRAF = requestAnimationFrame(micLoop);
+  }
+
+  // ── Start / Stop ────────────────────────────────────────────────────────────
   async function startMic() {
     try {
       micStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,   // abans true → filtrava la veu com a soroll
-          autoGainControl: false     // abans true → atenuava el senyal
-        }
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
       });
     } catch (e) {
       alert("No s'ha pogut accedir al micròfon. Dona permís al navegador.");
       return;
     }
-
     try {
-      if (!micCtx) {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        micCtx = new AC();
-      }
+      if (!micCtx) { const AC = window.AudioContext || window.webkitAudioContext; micCtx = new AC(); }
       if (micCtx.state === "suspended") await micCtx.resume();
-
       const source = micCtx.createMediaStreamSource(micStream);
-      micAnalyser = micCtx.createAnalyser();
-      micAnalyser.fftSize = 2048;
+      micAnalyser  = micCtx.createAnalyser();
+      micAnalyser.fftSize = 4096;
       micAnalyser.smoothingTimeConstant = 0;
-      // Connexió directa sense filtres per diagnosticar
       source.connect(micAnalyser);
-
-      micDetector = micDetectorObj;
       micBuffer = new Float32Array(micAnalyser.fftSize);
-
-      console.log("[MIC] Stream actiu. sampleRate:", micCtx.sampleRate,
-                  "tracks:", micStream.getAudioTracks().map(t => t.label + " enabled=" + t.enabled + " muted=" + t.muted));
     } catch (e) {
-      alert("Error inicialitzant la detecció de so: " + e.message);
-      stopMic();
-      return;
+      alert("Error inicialitzant el micròfon: " + e.message);
+      stopMic(); return;
     }
-
     micActive = true;
-    micHistory = [];
+    yinHistory = [];
     micLastMatchAt = 0;
-    micSilenceFramesSinceMatch = 999;
     micBtn.classList.add("active");
-    micBtn.textContent = "🔴 Escoltant so...";
+    micBtn.textContent = "🔴 Escoltant...";
     micLoop();
+    // Arrenca Speech API en paral·lel
+    if (!speechRec) initSpeech();
+    if (speechRec) { speechLive = true; try { speechRec.start(); } catch(_) {} }
   }
 
   function stopMic() {
-    micActive = false;
-    if (micRAF) cancelAnimationFrame(micRAF);
-    if (micStream) micStream.getTracks().forEach(t => t.stop());
-    micStream = null;
+    micActive  = false;
+    speechLive = false;
+    if (micRAF)    { cancelAnimationFrame(micRAF); micRAF = null; }
+    if (speechRec) { try { speechRec.stop(); } catch(_) {} }
+    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
     micBtn.classList.remove("active");
-    micBtn.textContent = "🎹 So";
+    micBtn.textContent = "🎤 Veu";
     micStatus.textContent = "";
     micStatus.classList.remove("detected");
-  }
-
-  function micLoop() {
-    if (!micActive || !micAnalyser || !micDetector) return;
-    micAnalyser.getFloatTimeDomainData(micBuffer);
-
-    let sumSq = 0;
-    for (let i = 0; i < micBuffer.length; i++) sumSq += micBuffer[i] * micBuffer[i];
-    const rms = Math.sqrt(sumSq / micBuffer.length);
-
-    const MIN_RMS_DETECT  = 0.01;  // sensible per micròfons fluixos
-    const MIN_RMS_SILENCE = 0.005;
-    const MIN_CLARITY     = 0.85;
-    const SILENCE_FRAMES_REQUIRED = 10;
-
-    const isSilent = rms < MIN_RMS_SILENCE;
-    if (isSilent) micSilenceFramesSinceMatch++;
-
-    // SEMPRE mostrem el RMS per poder diagnosticar
-    const rmsStr = "rms:" + rms.toFixed(3);
-
-    if (rms > MIN_RMS_DETECT) {
-      const [freq, clarity] = micDetector.findPitch(micBuffer, micCtx.sampleRate);
-      if (freq > 60 && freq < 1500) {
-        const noteCa = freqToNoteCa(freq);
-        micStatus.textContent = (noteCa ? noteCa.toUpperCase() : "?") +
-                                "  " + Math.round(freq) + "Hz  " + rmsStr +
-                                "  c:" + clarity.toFixed(2);
-        if (noteCa && clarity > MIN_CLARITY) {
-          micStatus.classList.add("detected");
-
-          micHistory.push(noteCa);
-          if (micHistory.length > 6) micHistory.shift();
-
-          if (micHistory.length >= 6 && micSilenceFramesSinceMatch >= SILENCE_FRAMES_REQUIRED) {
-            const counts = {};
-            micHistory.forEach(n => counts[n] = (counts[n] || 0) + 1);
-            let bestNote = null, bestCount = 0;
-            for (const n in counts) {
-              if (counts[n] > bestCount) { bestCount = counts[n]; bestNote = n; }
-            }
-            const now = performance.now();
-            if (bestCount >= 4 && now - micLastMatchAt > 1000) {
-              micLastMatchAt = now;
-              micSilenceFramesSinceMatch = 0;
-              micHistory = [];
-              // Si el nom detectat coincideix amb la nota actual, clica la tecla
-              // exacta (octava correcta); si no, la primera tecla amb aquell nom.
-              let btn = null;
-              if (currentStep < sequence.length) {
-                const cur = sequence[currentStep];
-                if (NOTE_NAMES_CA[noteLetter(cur.note)] === bestNote) {
-                  btn = trainPiano.querySelector('[data-pitch="' + cur.note + '"]');
-                }
-              }
-              if (!btn) btn = trainPiano.querySelector('.nk-key[data-note="' + bestNote + '"]');
-              if (btn) btn.click();
-            }
-          }
-        } else {
-          micStatus.classList.remove("detected");
-        }
-      } else {
-        micStatus.textContent = "senyal  " + rmsStr;
-        micStatus.classList.remove("detected");
-      }
-    } else {
-      micStatus.textContent = "🔇 " + rmsStr;
-      micStatus.classList.remove("detected");
-      micHistory = [];
-    }
-
-    micRAF = requestAnimationFrame(micLoop);
   }
 
   micBtn.addEventListener("click", () => {
