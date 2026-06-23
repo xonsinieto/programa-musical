@@ -1116,7 +1116,7 @@
   function yinPitch(buffer, sampleRate) {
     const N = buffer.length;
     const W = Math.floor(N / 2);
-    const THRESH = 0.12;
+    const THRESH = 0.15; // lleugerament més permissiu per veu
 
     const diff = new Float32Array(W);
     for (let tau = 1; tau < W; tau++) {
@@ -1133,8 +1133,9 @@
       cmndf[tau] = run > 0 ? diff[tau] * tau / run : 1;
     }
 
-    const tauMin = Math.floor(sampleRate / 1400);
-    const tauMax = Math.min(W - 1, Math.floor(sampleRate / 48));
+    // Rang de veu: 65 Hz (C2) a 700 Hz (F5) — evita detectar harmònics alts
+    const tauMin = Math.ceil(sampleRate / 700);
+    const tauMax = Math.min(W - 1, Math.floor(sampleRate / 65));
     let tau = Math.max(2, tauMin);
     while (tau < tauMax) {
       if (cmndf[tau] < THRESH) {
@@ -1144,6 +1145,18 @@
       tau++;
     }
     if (tau >= tauMax) return [0, 0];
+
+    // Comprovació sub-harmònica: si 2×tau o 3×tau també té un mínim
+    // vàlid, preferim-lo (freq menor = fonamental, no harmònic).
+    // Exemple: Do (261Hz) detectat com Sol (784Hz = 3×Do) → tau×3 = Do ✓
+    for (const mult of [2, 3]) {
+      const t2 = Math.round(tau * mult);
+      if (t2 >= tauMax) break;
+      let ts = Math.max(t2 - 3, tau + 1);
+      const te = Math.min(t2 + 4, tauMax);
+      while (ts + 1 < te && cmndf[ts + 1] < cmndf[ts]) ts++;
+      if (cmndf[ts] < THRESH * 1.6) { tau = ts; break; } // prefer lower freq
+    }
 
     let t = tau;
     if (tau > 1 && tau < W - 1) {
@@ -1155,6 +1168,8 @@
   }
 
   function freqToNoteCa(freq) {
+    // Fora del rang vocal raonable, rebutgem
+    if (freq < 65 || freq > 700) return null;
     const midi = 12 * Math.log2(freq / 440) + 69;
     const semi = ((Math.round(midi) % 12) + 12) % 12;
     let bestSemi = 0, bestDist = 100;
@@ -1163,7 +1178,7 @@
       if (d > 6) d = 12 - d;
       if (d < bestDist) { bestDist = d; bestSemi = n; }
     }
-    if (bestDist > 1.0) return null;
+    if (bestDist > 1.5) return null; // fins a 1.5 semitò (veu no professional)
     return NOTE_CLASS_BY_SEMITONE[bestSemi] || null;
   }
 
