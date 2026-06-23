@@ -1792,10 +1792,15 @@ main {
    pt-piano de Partitures. Tecles blanques = .note-btn (JS intacte);
    tecles negres = decoratives (només estètica de piano).
    ============================================================ */
+/* El contenidor del piano s'alinea exactament com #staff-container */
 .answer-buttons.note-kbd {
   display: block;
   grid-template-columns: none;
   margin-bottom: 20px;
+  width: min(90vw, 1200px);
+  position: relative;
+  left: 50%;
+  translate: -50% 0;
 }
 
 .nk-scroll {
@@ -1803,21 +1808,19 @@ main {
   padding: 4px 0 8px;
 }
 
-/* Piano alineat al pentagrama: mateixa amplada que #staff-container */
 .nk-piano {
   position: relative;
-  width: min(90vw, 1200px);
+  width: 100%;
   height: 210px;
-  margin: 0 auto;
   display: flex;
   border-radius: 4px 4px 9px 9px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
 }
 
-/* L1 (8 tecles): limita l'amplada per tecla a ~90px màxim perquè no quedin massa
-   amples. 8 × 90px = 720px; 15 × 80px = 1200px (L2 omple normalment). */
+/* L1 (8 tecles): màxim 720px centrat dins el contenidor */
 .nk-piano:not(.nk-md):not(.nk-lg):not(.nk-xl) {
-  width: min(90vw, 720px);
+  width: min(100%, 720px);
+  margin: 0 auto;
 }
 
 /* Tecla blanca = botó de resposta; s'estira per omplir l'espai */
