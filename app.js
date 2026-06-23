@@ -859,21 +859,44 @@
     return out;
   })();
 
-  // Rang de tecles blanques segons nivell + clau (i notes reals de la seqüència)
-  function keyboardRangePitches() {
-    const lvl  = parseInt(levelSelect.value, 10) || 3;
-    const clef = clefSelect.value;
+  // Genera l'HTML d'un piano: tecles blanques (data-pitch + data-note) i
+  // negres decoratives entre naturals consecutives (excepte Mi-Fa i Si-Do).
+  function pianoKeysHTML(whites, keyClass) {
+    const N = whites.length;
+    const blackPct = 62 / N;
+    let html = "";
+    whites.forEach((p) => {
+      const ca = NOTE_NAMES_CA[noteLetter(p)] || "";
+      const label = ca.charAt(0).toUpperCase() + ca.slice(1);
+      html += '<button class="note-btn nk-key' + (keyClass ? " " + keyClass : "") +
+              '" data-pitch="' + p + '" data-note="' + ca + '">' + label + '</button>';
+    });
+    whites.forEach((p, i) => {
+      if (i >= N - 1) return;
+      const l = noteLetter(p);
+      if (l === "c" || l === "d" || l === "f" || l === "g" || l === "a") {
+        const leftPct = ((i + 1) * 100) / N - blackPct / 2;
+        html += '<span class="nk-blk" style="left:' + leftPct.toFixed(3) +
+                '%;width:' + blackPct.toFixed(3) + '%" aria-hidden="true"></span>';
+      }
+    });
+    return html;
+  }
+
+  // Rang de naturals segons nivell + clau (+ pitches extra). levelVal=null → només
+  // els pitches extra (p. ex. mode cançó, que cobreix exactament el rang de la cançó).
+  function pitchesForLevelClef(levelVal, clefVal, extra) {
     const pool = [];
-    if (modeSelect.value !== "song") {
+    if (levelVal !== null) {
+      const lvl = parseInt(levelVal, 10) || 3;
       const addClef = (c) => {
         const arr = (lvl === 3 || !LEVELS[lvl]) ? RANGES[c] : LEVELS[lvl][c];
         pool.push.apply(pool, arr);
       };
-      if (clef === "both") { addClef("treble"); addClef("bass"); }
-      else addClef(clef);
+      if (clefVal === "both") { addClef("treble"); addClef("bass"); }
+      else addClef(clefVal);
     }
-    // Cançons i "fallades" poden sortir-se del rang del nivell → inclou-les sempre
-    sequence.forEach((s) => pool.push(s.note));
+    if (extra) extra.forEach((p) => pool.push(p));
     if (!pool.length) pool.push("c/4", "c/5");
     const midis = pool.map(pitchToMidi);
     const minM = Math.min.apply(null, midis);
@@ -884,37 +907,26 @@
     });
   }
 
-  function renderAnswerKeyboard() {
-    if (!trainPiano) return;
-    const whites = keyboardRangePitches();
-    const N = whites.length;
-    const blackPct = 62 / N;   // amplada relativa de la tecla negra
-    let html = "";
-    // Tecles blanques (botons de resposta)
-    whites.forEach((p) => {
-      const ca = NOTE_NAMES_CA[noteLetter(p)] || "";
-      const label = ca.charAt(0).toUpperCase() + ca.slice(1);
-      html += '<button class="note-btn nk-key" data-pitch="' + p +
-              '" data-note="' + ca + '">' + label + '</button>';
-    });
-    // Tecles negres decoratives (entre naturals consecutives, excepte Mi-Fa i Si-Do)
-    whites.forEach((p, i) => {
-      if (i >= N - 1) return;
-      const l = noteLetter(p);
-      if (l === "c" || l === "d" || l === "f" || l === "g" || l === "a") {
-        const leftPct = ((i + 1) * 100) / N - blackPct / 2;
-        html += '<span class="nk-blk" style="left:' + leftPct.toFixed(3) +
-                '%;width:' + blackPct.toFixed(3) + '%" aria-hidden="true"></span>';
-      }
-    });
-    trainPiano.innerHTML = html;
-    // Centra la vista sobre el Do central com a referència neutra (no revela la resposta)
-    const scroll = trainPiano.parentElement;
+  // Centra la vista sobre el Do central com a referència neutra (no revela la resposta)
+  function scrollKeyboardToMiddle(piano) {
+    const scroll = piano.parentElement;
     if (scroll && scroll.scrollWidth > scroll.clientWidth) {
-      const ref = trainPiano.querySelector('[data-pitch="c/4"]') ||
-                  trainPiano.querySelector(".nk-key");
+      const ref = piano.querySelector('[data-pitch="c/4"]') || piano.querySelector(".nk-key");
       if (ref) scroll.scrollLeft = ref.offsetLeft - scroll.clientWidth / 2 + ref.offsetWidth / 2;
     }
+  }
+
+  function keyboardRangePitches() {
+    const seqPitches = sequence.map((s) => s.note);
+    // Cançons i "fallades" poden sortir-se del rang → s'inclouen sempre.
+    if (modeSelect.value === "song") return pitchesForLevelClef(null, null, seqPitches);
+    return pitchesForLevelClef(levelSelect.value, clefSelect.value, seqPitches);
+  }
+
+  function renderAnswerKeyboard() {
+    if (!trainPiano) return;
+    trainPiano.innerHTML = pianoKeysHTML(keyboardRangePitches());
+    scrollKeyboardToMiddle(trainPiano);
   }
 
   function startRound() {
@@ -2538,7 +2550,7 @@
   const spCorrectEl    = document.getElementById("sp-correct");
   const spWrongEl      = document.getElementById("sp-wrong");
   const spBestEl       = document.getElementById("sp-best");
-  const spNoteButtons  = document.querySelectorAll(".sp-note-btn");
+  const spPiano        = document.getElementById("sp-piano");
 
   const SP_MAX_SPEED = 10;
   const SP_STREAK_TO_ADVANCE = 30;
@@ -2821,7 +2833,7 @@
     spRAF = requestAnimationFrame(spGameLoop);
   }
 
-  function spHandleAnswer(answerCa, btn) {
+  function spHandleAnswer(answerPitch, btn) {
     if (spState !== "playing") return;
     let target = null;
     for (const n of spActive) {
@@ -2829,24 +2841,18 @@
       if (!target || n.x < target.x) target = n;
     }
     if (!target) return;
-    const correctCa = NOTE_NAMES_CA[noteLetter(target.note)];
 
-    if (answerCa === correctCa) {
+    if (answerPitch === target.note) {
       target.state = "hit";
       spCorrect++;
       spStreak++;
-      btn.classList.add("correct-flash");
+      if (btn) btn.classList.add("correct-flash");
       playNote(target.note);
       spColorNote(target.el, "#27ae60");
       burstStaff(spContainer);
-
-      // 🎸 Guitar Hero style: explosió de partícules + flash hit line
       burstNoteAt(target.el, ["#00F0FF", "#00FF94", "#FFB800", "#FF10F0"], 26);
       flashHitLine();
-
-      // Para l'animació WAAPI i congela la posició (perquè no segueixi avançant)
       if (target.anim) { try { target.anim.pause(); } catch(e) {} }
-
       const el = target.el;
       setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 160);
       const idx = spActive.indexOf(target);
@@ -2855,14 +2861,14 @@
       tickCounter(spCorrectEl);
       tickCounter(spStreakEl);
       setTimeout(() => {
-        spNoteButtons.forEach(b => b.classList.remove("correct-flash"));
+        if (spPiano) spPiano.querySelectorAll(".nk-key").forEach(b => b.classList.remove("correct-flash"));
       }, 200);
       if (spStreak >= SP_STREAK_TO_ADVANCE) {
         spLevelUp();
       }
     } else {
       spWrong++;
-      btn.classList.add("wrong-flash");
+      if (btn) btn.classList.add("wrong-flash");
       shakeElement(spContainer);
       tickCounter(spWrongEl);
       spUpdateStats();
@@ -2928,7 +2934,7 @@
     spRetryBar.classList.remove("hidden");
 
     setTimeout(() => {
-      spNoteButtons.forEach(b => b.classList.remove("correct-flash","wrong-flash"));
+      if (spPiano) spPiano.querySelectorAll(".nk-key").forEach(b => b.classList.remove("correct-flash","wrong-flash"));
     }, 200);
   }
 
@@ -2984,7 +2990,15 @@
     spRAF = requestAnimationFrame(spGameLoop);
   }
 
+  function renderSpKeyboard() {
+    if (!spPiano) return;
+    const whites = pitchesForLevelClef(spLevelSelect.value, spClefSelect.value, null);
+    spPiano.innerHTML = pianoKeysHTML(whites);
+    scrollKeyboardToMiddle(spPiano);
+  }
+
   function spStart() {
+    renderSpKeyboard();
     spRunning = true;
     spCurrentSpeed = 1;
     spMaxSpeedThisRun = 1;
@@ -3021,11 +3035,14 @@
   }
 
   spClefSelect.addEventListener("change", () => {
+    renderSpKeyboard();
     spResetRunStats();
   });
   spLevelSelect.addEventListener("change", () => {
+    renderSpKeyboard();
     spResetRunStats();
   });
+  renderSpKeyboard();
 
   spStartBtn.addEventListener("click", spStart);
   spRetryBtn.addEventListener("click", spRetry);
@@ -3057,8 +3074,9 @@
       spResetRunStats();
     }
   });
-  spNoteButtons.forEach(btn => {
-    btn.addEventListener("click", () => spHandleAnswer(btn.dataset.note, btn));
+  spPiano.addEventListener("click", (e) => {
+    const key = e.target.closest(".nk-key");
+    if (key && spPiano.contains(key)) spHandleAnswer(key.dataset.pitch, key);
   });
 
   // ---------- CAÇA (triar nota-diana + memoritzar posicions + caçar-la entre aleatòries) ----------
@@ -3082,7 +3100,8 @@
   const huSpeedLevelEl  = document.getElementById("hu-speed-level");
   const huStreakEl      = document.getElementById("hu-streak");
   const huBestEl        = document.getElementById("hu-best");
-  const huTargetButtons = document.querySelectorAll(".hu-target-btn");
+  const huPiano         = document.getElementById("hu-piano");
+  const huTargetButtons = document.querySelectorAll(".hu-target-btn"); // buit ara (compatibilitat)
 
   const HU_BEST_KEY = "huntBestByProfile_v1";
   // Mapeig del data-note del botó (català) a la lletra pitch (ús intern + NOTE_NAMES_CA)
@@ -3489,6 +3508,17 @@
     huBestEl.textContent = best > 0 ? (best + "/" + SP_STREAK_TO_ADVANCE) : "—";
   }
 
+  function renderHuKeyboard() {
+    if (!huPiano) return;
+    // 1 octava fixa (c/4-b/4): el selector de diana no depèn del nivell
+    const whites = ["c/4","d/4","e/4","f/4","g/4","a/4","b/4"];
+    huPiano.innerHTML = pianoKeysHTML(whites, "hu-target-btn");
+    // Marca la diana activa
+    const caName = NOTE_NAMES_CA[huTarget] || "do";
+    huPiano.querySelectorAll(".nk-key").forEach(b =>
+      b.classList.toggle("is-selected", b.dataset.note === caName));
+  }
+
   function huSetTarget(letter) {
     // letter és la lletra pitch (c, d, e, f, g, a, b)
     if (!NOTE_NAMES_CA[letter]) return; // protecció per si arriba un valor estrany
@@ -3501,7 +3531,11 @@
     const memoTargetHintEl = document.getElementById("hu-memo-target-hint");
     if (memoTargetEl) memoTargetEl.textContent = caUpper;
     if (memoTargetHintEl) memoTargetHintEl.textContent = caUpper;
-    huTargetButtons.forEach(b => b.classList.toggle("is-selected", b.dataset.note === caName));
+    // Marca la tecla seleccionada al piano
+    if (huPiano) {
+      huPiano.querySelectorAll(".nk-key").forEach(b =>
+        b.classList.toggle("is-selected", b.dataset.note === caName));
+    }
     // Canvi de diana → reinicia partida (nou memoritzar)
     huCurrentSpeed = parseInt(huSpeedSelect.value, 10) || huCurrentSpeed;
     huStreak = 0; huCorrect = 0;
@@ -3520,11 +3554,12 @@
   huStartBtn.addEventListener("click", huStart);
   huRetryBtn.addEventListener("click", huRetry);
   huRestartBtn.addEventListener("click", huRestart);
-  huTargetButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
-      const letter = HU_CA_TO_LETTER[btn.dataset.note];
-      if (letter) huSetTarget(letter);
-    });
+  renderHuKeyboard();
+  huPiano.addEventListener("click", (e) => {
+    const key = e.target.closest(".nk-key");
+    if (!key || !huPiano.contains(key)) return;
+    const letter = HU_CA_TO_LETTER[key.dataset.note];
+    if (letter) huSetTarget(letter);
   });
   huClefSelect.addEventListener("change", () => huSetTarget(huTarget));
   huLevelSelect.addEventListener("change", () => huSetTarget(huTarget));
