@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v64-piano-all-screens";
+const CACHE = "lectura-notes-v65-piano-no-scroll";
 const FILES = [
   "./",
   "./index.html",

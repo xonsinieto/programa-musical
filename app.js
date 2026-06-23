@@ -923,10 +923,18 @@
     return pitchesForLevelClef(levelSelect.value, clefSelect.value, seqPitches);
   }
 
+  function setSizeClass(el, n) {
+    el.classList.remove("nk-md", "nk-lg", "nk-xl");
+    if (n > 22) el.classList.add("nk-xl");
+    else if (n > 12) el.classList.add("nk-lg");
+    else if (n > 8)  el.classList.add("nk-md");
+  }
+
   function renderAnswerKeyboard() {
     if (!trainPiano) return;
-    trainPiano.innerHTML = pianoKeysHTML(keyboardRangePitches());
-    scrollKeyboardToMiddle(trainPiano);
+    const whites = keyboardRangePitches();
+    trainPiano.innerHTML = pianoKeysHTML(whites);
+    setSizeClass(trainPiano, whites.length);
   }
 
   function startRound() {
@@ -2994,7 +3002,7 @@
     if (!spPiano) return;
     const whites = pitchesForLevelClef(spLevelSelect.value, spClefSelect.value, null);
     spPiano.innerHTML = pianoKeysHTML(whites);
-    scrollKeyboardToMiddle(spPiano);
+    setSizeClass(spPiano, whites.length);
   }
 
   function spStart() {
@@ -3510,10 +3518,9 @@
 
   function renderHuKeyboard() {
     if (!huPiano) return;
-    // 1 octava fixa (c/4-b/4): el selector de diana no depèn del nivell
     const whites = ["c/4","d/4","e/4","f/4","g/4","a/4","b/4"];
     huPiano.innerHTML = pianoKeysHTML(whites, "hu-target-btn");
-    // Marca la diana activa
+    setSizeClass(huPiano, whites.length);
     const caName = NOTE_NAMES_CA[huTarget] || "do";
     huPiano.querySelectorAll(".nk-key").forEach(b =>
       b.classList.toggle("is-selected", b.dataset.note === caName));

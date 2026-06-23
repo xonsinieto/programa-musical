@@ -1798,23 +1798,16 @@ main {
   margin-bottom: 20px;
 }
 
-/* Embolcall amb scroll horitzontal: quan el teclat (avançat / tot el piano)
-   és més ample que la pantalla, es pot arrossegar lateralment. */
+/* Sense scroll: el piano sempre omple l'amplada disponible */
 .nk-scroll {
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: visible;
   padding: 4px 0 8px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
 }
 
-/* Cos del piano: contenidor relatiu on les blanques s'alineen i les
-   negres es munten a sobre en absolut (com un teclat real).
-   width:max-content perquè creixi amb el nombre de tecles. */
+/* Cos del piano: 100% d'amplada, tecles s'estiren per omplir */
 .nk-piano {
   position: relative;
-  width: max-content;
-  max-width: none;
+  width: 100%;
   height: 210px;
   margin: 0 auto;
   display: flex;
@@ -1822,12 +1815,11 @@ main {
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
 }
 
-/* Tecla blanca = botó de resposta (reseteja l'aspecte glass de .note-btn) */
+/* Tecla blanca = botó de resposta; s'estira per omplir l'espai */
 .nk-key {
   position: relative;
   z-index: 1;
-  flex: 0 0 auto;
-  width: 58px;
+  flex: 1 1 0;
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -1887,9 +1879,17 @@ main {
   pointer-events: none;
 }
 
+/* Font escalada per nombre de tecles (afegida per JS via classe) */
+.nk-piano.nk-md  .nk-key { font-size: 0.82rem; }  /* ~15 tecles */
+.nk-piano.nk-lg  .nk-key { font-size: 0.6rem;  }  /* ~29 tecles */
+.nk-piano.nk-xl  .nk-key { font-size: 0.45rem; padding-bottom: 6px; } /* 52 tecles */
+
 @media (max-width: 600px) {
   .nk-piano { height: 165px; }
-  .nk-key { width: 46px; font-size: 0.92rem; padding-bottom: 10px; }
+  .nk-key { font-size: 0.92rem; padding-bottom: 10px; }
+  .nk-piano.nk-md  .nk-key { font-size: 0.62rem; }
+  .nk-piano.nk-lg  .nk-key { font-size: 0.42rem; }
+  .nk-piano.nk-xl  .nk-key { font-size: 0.3rem; padding-bottom: 4px; }
 }
 
 .stats {
