@@ -210,14 +210,25 @@
 
       <div id="feedback" class="feedback"></div>
 
-      <div class="answer-buttons">
-        <button class="note-btn" data-note="do">Do</button>
-        <button class="note-btn" data-note="re">Re</button>
-        <button class="note-btn" data-note="mi">Mi</button>
-        <button class="note-btn" data-note="fa">Fa</button>
-        <button class="note-btn" data-note="sol">Sol</button>
-        <button class="note-btn" data-note="la">La</button>
-        <button class="note-btn" data-note="si">Si</button>
+      <!-- Teclat de resposta: mini-piano inline (coherent amb pt-piano).
+           Les tecles blanques conserven .note-btn + data-note perquè tota
+           la lògica JS (handleAnswer, flaixos correct/wrong) segueixi igual. -->
+      <div class="answer-buttons note-kbd">
+        <div class="nk-piano">
+          <button class="note-btn nk-key" data-note="do">Do</button>
+          <button class="note-btn nk-key" data-note="re">Re</button>
+          <button class="note-btn nk-key" data-note="mi">Mi</button>
+          <button class="note-btn nk-key" data-note="fa">Fa</button>
+          <button class="note-btn nk-key" data-note="sol">Sol</button>
+          <button class="note-btn nk-key" data-note="la">La</button>
+          <button class="note-btn nk-key" data-note="si">Si</button>
+          <!-- Tecles negres decoratives, muntades sobre les blanques -->
+          <span class="nk-blk" style="left:10.0%" aria-hidden="true"></span>
+          <span class="nk-blk" style="left:24.3%" aria-hidden="true"></span>
+          <span class="nk-blk" style="left:52.9%" aria-hidden="true"></span>
+          <span class="nk-blk" style="left:67.2%" aria-hidden="true"></span>
+          <span class="nk-blk" style="left:81.5%" aria-hidden="true"></span>
+        </div>
       </div>
 
       <div class="stats">

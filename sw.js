@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v61-key-hint";
+const CACHE = "lectura-notes-v62-piano-keyboard";
 const FILES = [
   "./",
   "./index.html",
