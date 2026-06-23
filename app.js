@@ -457,7 +457,7 @@
       "c/1","d/1","e/1","f/1","g/1","a/1","b/1",
       "c/2","d/2","e/2","f/2","g/2","a/2","b/2",
       "c/3","d/3","e/3","f/3","g/3","a/3","b/3",
-      "c/4","d/4","e/4"
+      "c/4"
     ]
   };
 
@@ -883,21 +883,32 @@
     return html;
   }
 
-  // Rang de naturals segons nivell + clau (+ pitches extra). levelVal=null → només
-  // els pitches extra (p. ex. mode cançó, que cobreix exactament el rang de la cançó).
+  // Rang de naturals segons nivell + clau (+ pitches extra).
+  // REGLA MUSICAL: Do central (c/4) és l'àncora:
+  //   bass  → notes ≤ c/4 (Fa queda a l'esquerra del Do central)
+  //   treble → notes ≥ c/4 (Sol queda a la dreta del Do central)
+  //   both   → les dues bandes; c/4 queda al mig.
+  const C4_MIDI = pitchToMidi("c/4");
+
   function pitchesForLevelClef(levelVal, clefVal, extra) {
     const pool = [];
     if (levelVal !== null) {
       const lvl = parseInt(levelVal, 10) || 3;
       const addClef = (c) => {
         const arr = (lvl === 3 || !LEVELS[lvl]) ? RANGES[c] : LEVELS[lvl][c];
-        pool.push.apply(pool, arr);
+        arr.forEach((p) => {
+          const m = pitchToMidi(p);
+          if (c === "bass"   && m > C4_MIDI) return; // bass no pot passar del Do central
+          if (c === "treble" && m < C4_MIDI) return; // treble no pot baixar del Do central
+          pool.push(p);
+        });
       };
       if (clefVal === "both") { addClef("treble"); addClef("bass"); }
       else addClef(clefVal);
     }
     if (extra) extra.forEach((p) => pool.push(p));
-    if (!pool.length) pool.push("c/4", "c/5");
+    // Sempre incloem c/4 com a àncora visible
+    if (!pool.includes("c/4")) pool.push("c/4");
     const midis = pool.map(pitchToMidi);
     const minM = Math.min.apply(null, midis);
     const maxM = Math.max.apply(null, midis);
@@ -917,10 +928,13 @@
   }
 
   function keyboardRangePitches() {
-    const seqPitches = sequence.map((s) => s.note);
-    // Cançons i "fallades" poden sortir-se del rang → s'inclouen sempre.
-    if (modeSelect.value === "song") return pitchesForLevelClef(null, null, seqPitches);
-    return pitchesForLevelClef(levelSelect.value, clefSelect.value, seqPitches);
+    if (modeSelect.value === "song") {
+      // Cançons: rang exacte de les notes de la cançó sense restricció de clau
+      return pitchesForLevelClef(null, null, sequence.map((s) => s.note));
+    }
+    // En modes aleatoris, les notes extra de la seqüència respeten la regla
+    // d'àncora (bass ≤ c/4, treble ≥ c/4) perquè venen de LEVELS/RANGES ja filtrats
+    return pitchesForLevelClef(levelSelect.value, clefSelect.value, sequence.map((s) => s.note));
   }
 
   function setSizeClass(el, n) {

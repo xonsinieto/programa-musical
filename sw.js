@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v66-piano-aligned";
+const CACHE = "lectura-notes-v67-c4-anchor";
 const FILES = [
   "./",
   "./index.html",
