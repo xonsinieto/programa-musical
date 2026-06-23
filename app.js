@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   const VF = Vex.Flow;
 
   // ======================================================
@@ -1175,21 +1175,24 @@
   let speechLive = false;
 
   function matchNoteCA(text) {
-    const t = text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-    if (/\bsol\b/.test(t)) return "sol"; // primer: evita que "la" o "si" cassin "sol"
-    if (/\bsi\b/.test(t))  return "si";
-    if (/\bdo\b/.test(t))  return "do";
-    if (/\bre\b/.test(t))  return "re";
-    if (/\bmi\b/.test(t))  return "mi";
-    if (/\bfa\b/.test(t))  return "fa";
-    if (/\bla\b/.test(t))  return "la";
+    // Normalitza a ASCII, afegeix espais com a delimitadors de paraula
+    const t = " " + text.toLowerCase().replace(/[^a-z]/g, " ") + " ";
+    if (t.includes(" sol ")) return "sol";
+    if (t.includes(" si "))  return "si";
+    if (t.includes(" do "))  return "do";
+    if (t.includes(" re "))  return "re";
+    if (t.includes(" mi "))  return "mi";
+    if (t.includes(" fa "))  return "fa";
+    if (t.includes(" la "))  return "la";
     return null;
   }
 
   function initSpeech() {
     if (!SpeechRec) return;
     speechRec = new SpeechRec();
-    speechRec.lang = "ca-ES";
+    // es-ES: Chrome té model espanyol robust que reconeix solfège (do/re/mi...)
+    // millor que ca-ES que pot no estar disponible offline.
+    speechRec.lang = "es-ES";
     speechRec.continuous = true;
     speechRec.interimResults = true;
     speechRec.maxAlternatives = 3;
@@ -1225,25 +1228,31 @@
 
   // ── Bucle YIN ──────────────────────────────────────────────────────────────
   let yinHistory = [];
-  const YIN_FRAMES  = 5;
-  const YIN_AGREE   = 4;
-  const YIN_CONF    = 0.50;
-  const YIN_RMS_MIN = 0.007;
+  let yinFrameCounter = 0;
+  const YIN_FRAMES  = 4;
+  const YIN_AGREE   = 3;
+  const YIN_CONF    = 0.40;
+  const YIN_RMS_MIN = 0.006;
 
   function micLoop() {
     if (!micActive || !micAnalyser) return;
+    micRAF = requestAnimationFrame(micLoop);
+
+    // Llegim sempre el RMS (barat), però YIN (car) cada 2 frames (~30fps)
     micAnalyser.getFloatTimeDomainData(micBuffer);
     let sumSq = 0;
     for (let i = 0; i < micBuffer.length; i++) sumSq += micBuffer[i] * micBuffer[i];
     const rms = Math.sqrt(sumSq / micBuffer.length);
 
     if (rms < YIN_RMS_MIN) {
-      micStatus.textContent = "🔇";
+      micStatus.textContent = "🔇 " + rms.toFixed(3);
       micStatus.classList.remove("detected");
       yinHistory = [];
-      micRAF = requestAnimationFrame(micLoop);
       return;
     }
+
+    yinFrameCounter++;
+    if (yinFrameCounter % 2 !== 0) return; // throttle: YIN cada 2 frames
 
     const [freq, conf] = yinPitch(micBuffer, micCtx.sampleRate);
     if (freq > 48 && freq < 1400 && conf > YIN_CONF) {
@@ -1261,16 +1270,15 @@
           if (bestC >= YIN_AGREE) { yinHistory = []; triggerMicNote(best, "pitch"); }
         }
       } else {
-        micStatus.textContent = Math.round(freq) + "Hz ?  c:" + conf.toFixed(2);
+        micStatus.textContent = Math.round(freq) + "Hz  c:" + conf.toFixed(2);
         micStatus.classList.remove("detected");
         yinHistory = [];
       }
     } else {
-      micStatus.textContent = "♩ rms:" + rms.toFixed(3);
+      micStatus.textContent = "rms:" + rms.toFixed(3) + (conf > 0 ? "  c:" + conf.toFixed(2) : "");
       micStatus.classList.remove("detected");
       yinHistory = [];
     }
-    micRAF = requestAnimationFrame(micLoop);
   }
 
   // ── Start / Stop ────────────────────────────────────────────────────────────
@@ -1288,7 +1296,7 @@
       if (micCtx.state === "suspended") await micCtx.resume();
       const source = micCtx.createMediaStreamSource(micStream);
       micAnalyser  = micCtx.createAnalyser();
-      micAnalyser.fftSize = 4096;
+      micAnalyser.fftSize = 2048; // YIN amb 2048 (W=1024) = 1M ops/frame, manejable
       micAnalyser.smoothingTimeConstant = 0;
       source.connect(micAnalyser);
       micBuffer = new Float32Array(micAnalyser.fftSize);

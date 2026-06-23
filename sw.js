@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v70-yin-speech";
+const CACHE = "lectura-notes-v71-yin-fast";
 const FILES = [
   "./",
   "./index.html",
