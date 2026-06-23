@@ -1798,21 +1798,26 @@ main {
   margin-bottom: 20px;
 }
 
-/* Sense scroll: el piano sempre omple l'amplada disponible */
 .nk-scroll {
   overflow: visible;
   padding: 4px 0 8px;
 }
 
-/* Cos del piano: 100% d'amplada, tecles s'estiren per omplir */
+/* Piano alineat al pentagrama: mateixa amplada que #staff-container */
 .nk-piano {
   position: relative;
-  width: 100%;
+  width: min(90vw, 1200px);
   height: 210px;
   margin: 0 auto;
   display: flex;
   border-radius: 4px 4px 9px 9px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+}
+
+/* L1 (8 tecles): limita l'amplada per tecla a ~90px màxim perquè no quedin massa
+   amples. 8 × 90px = 720px; 15 × 80px = 1200px (L2 omple normalment). */
+.nk-piano:not(.nk-md):not(.nk-lg):not(.nk-xl) {
+  width: min(90vw, 720px);
 }
 
 /* Tecla blanca = botó de resposta; s'estira per omplir l'espai */
