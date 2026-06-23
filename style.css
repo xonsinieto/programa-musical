@@ -1884,6 +1884,28 @@ main {
   pointer-events: none;
 }
 
+/* Tecla inactiva (fora del rang de la clau activa): visible però no clicable */
+.nk-key.nk-inactive {
+  opacity: 0.38;
+  pointer-events: none;
+  background: linear-gradient(#EDE8DC 0%, #E0D9C8 70%, #D5CCBA 100%);
+}
+
+/* Do central: lleugera marca + etiqueta "central" */
+.nk-key.nk-c4 {
+  background: linear-gradient(#FDF8EC 0%, #F0E8D0 70%, #E8DCBE 100%);
+  border-color: #B09060;
+}
+.nk-c4-sub {
+  display: block;
+  font-size: 0.45em;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+  color: #7a5a30;
+  line-height: 1;
+  margin-top: 1px;
+}
+
 /* Font escalada per nombre de tecles (afegida per JS via classe) */
 .nk-piano.nk-md  .nk-key { font-size: 0.82rem; }  /* ~15 tecles */
 .nk-piano.nk-lg  .nk-key { font-size: 0.6rem;  }  /* ~29 tecles */

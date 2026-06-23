@@ -859,17 +859,24 @@
     return out;
   })();
 
-  // Genera l'HTML d'un piano: tecles blanques (data-pitch + data-note) i
-  // negres decoratives entre naturals consecutives (excepte Mi-Fa i Si-Do).
-  function pianoKeysHTML(whites, keyClass) {
+  // Genera l'HTML d'un piano. activeSet (opcional): Set de pitches clicables;
+  // la resta es mostren apagades (nk-inactive). c/4 rep etiqueta "central".
+  function pianoKeysHTML(whites, keyClass, activeSet) {
     const N = whites.length;
     const blackPct = 62 / N;
     let html = "";
     whites.forEach((p) => {
-      const ca = NOTE_NAMES_CA[noteLetter(p)] || "";
+      const ca    = NOTE_NAMES_CA[noteLetter(p)] || "";
       const label = ca.charAt(0).toUpperCase() + ca.slice(1);
-      html += '<button class="note-btn nk-key' + (keyClass ? " " + keyClass : "") +
-              '" data-pitch="' + p + '" data-note="' + ca + '">' + label + '</button>';
+      const isC4  = (p === "c/4");
+      const inactive = activeSet && !activeSet.has(p) ? " nk-inactive" : "";
+      const c4cls    = isC4 ? " nk-c4" : "";
+      const inner    = isC4
+        ? label + '<span class="nk-c4-sub">central</span>'
+        : label;
+      html += '<button class="note-btn nk-key' +
+              (keyClass ? " " + keyClass : "") + inactive + c4cls +
+              '" data-pitch="' + p + '" data-note="' + ca + '">' + inner + '</button>';
     });
     whites.forEach((p, i) => {
       if (i >= N - 1) return;
@@ -881,6 +888,17 @@
       }
     });
     return html;
+  }
+
+  // Rang complet (sempre les dues claus) per al nivell, perquè c/4 quedi al mig.
+  // Retorna { pitches, activeSet } on activeSet = tecles clicables per la clau activa.
+  function buildKeyboardData(levelVal, clefVal, extra) {
+    const fullPitches  = pitchesForLevelClef(levelVal, "both", extra);
+    const activePitches = clefVal === "both"
+      ? fullPitches
+      : pitchesForLevelClef(levelVal, clefVal, extra);
+    const activeSet = new Set(activePitches);
+    return { pitches: fullPitches, activeSet };
   }
 
   // Rang de naturals segons nivell + clau (+ pitches extra).
@@ -946,9 +964,12 @@
 
   function renderAnswerKeyboard() {
     if (!trainPiano) return;
-    const whites = keyboardRangePitches();
-    trainPiano.innerHTML = pianoKeysHTML(whites);
-    setSizeClass(trainPiano, whites.length);
+    const seqPitches = modeSelect.value === "song" ? sequence.map(s => s.note) : sequence.map(s => s.note);
+    const { pitches, activeSet } = modeSelect.value === "song"
+      ? { pitches: pitchesForLevelClef(null, null, seqPitches), activeSet: null }
+      : buildKeyboardData(levelSelect.value, clefSelect.value, seqPitches);
+    trainPiano.innerHTML = pianoKeysHTML(pitches, null, activeSet);
+    setSizeClass(trainPiano, pitches.length);
   }
 
   function startRound() {
@@ -3014,9 +3035,9 @@
 
   function renderSpKeyboard() {
     if (!spPiano) return;
-    const whites = pitchesForLevelClef(spLevelSelect.value, spClefSelect.value, null);
-    spPiano.innerHTML = pianoKeysHTML(whites);
-    setSizeClass(spPiano, whites.length);
+    const { pitches, activeSet } = buildKeyboardData(spLevelSelect.value, spClefSelect.value, null);
+    spPiano.innerHTML = pianoKeysHTML(pitches, null, activeSet);
+    setSizeClass(spPiano, pitches.length);
   }
 
   function spStart() {
