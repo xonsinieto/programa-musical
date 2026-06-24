@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v81-tfjs-voice";
+const CACHE = "lectura-notes-v82-tfjs-preload";
 const FILES = [
   "./",
   "./index.html",
