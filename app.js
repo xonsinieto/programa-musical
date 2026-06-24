@@ -1093,16 +1093,254 @@
   });
   songSelect.addEventListener("change", startRound);
 
-  // ---------- DETECCIÓ DE VEU (WEB SPEECH API) ----------
-  // Estratègia: únicament Speech API (sense AudioContext ni pitch detection).
-  // Motiu: pitchy/YIN detecten freqüències i s'equivoquen sistemàticament amb
-  // harmònics de la veu humana (Do→Fa, Fa→Si...). La Speech API reconeix
-  // la PARAULA "do", "re"... i no té aquest problema.
-  const micBtn    = document.getElementById("mic-btn");
-  const micStatus = document.getElementById("mic-status");
-  let micActive   = false;
-  let micLastMatchAt = 0;
+  // ---------- DETECCIÓ DE VEU (TF.js transfer learning + Speech API fallback) ----------
+  const micBtn      = document.getElementById("mic-btn");
+  const micStatus   = document.getElementById("mic-status");
+  const micRecalBtn = document.getElementById("mic-recal-btn");
+  const vcalOverlay = document.getElementById("voice-cal-overlay");
 
+  let micActive = false, micLastMatchAt = 0;
+
+  // TF.js state (carregat lazy quan l'usuari prem el mic)
+  let tfBase = null, tfXfer = null, tfListening = false;
+  const TF_NOTES  = ['do','re','mi','fa','sol','la','si'];
+  const TF_LABELS = [...TF_NOTES, '_background_noise_'];
+  const TF_THRESH = 0.80;
+
+  function voiceModelKey() { return 'indexeddb://veu-' + currentProfile(); }
+
+  async function loadTFLibs() {
+    if (window.speechCommands) return true;
+    return new Promise(function(resolve) {
+      var s1 = document.createElement('script');
+      s1.src = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js';
+      s1.onload = function() {
+        var s2 = document.createElement('script');
+        s2.src = 'https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js';
+        s2.onload = function() { resolve(true); };
+        s2.onerror = function() { resolve(false); };
+        document.head.appendChild(s2);
+      };
+      s1.onerror = function() { resolve(false); };
+      document.head.appendChild(s1);
+    });
+  }
+
+  async function ensureBaseRecognizer() {
+    if (tfBase) return true;
+    try {
+      micStatus.textContent = "⏳ Carregant model (~20 MB, 1a vegada)...";
+      tfBase = window.speechCommands.create('BROWSER_FFT');
+      await tfBase.ensureModelLoaded();
+      return true;
+    } catch(err) {
+      tfBase = null;
+      micStatus.textContent = "⚠️ Cal internet la primera vegada";
+      console.warn('[TF base]', err);
+      return false;
+    }
+  }
+
+  async function hasStoredModel() {
+    try {
+      var models = await tf.io.listModels();
+      return voiceModelKey() in models;
+    } catch(err) { return false; }
+  }
+
+  async function tryLoadModel() {
+    if (!tfBase) return false;
+    try {
+      if (tfXfer) { try { tfXfer.stopListening(); } catch(e2) {} }
+      tfXfer = tfBase.createTransfer('veu-' + currentProfile());
+      await tfXfer.load(voiceModelKey());
+      return true;
+    } catch(err) { tfXfer = null; return false; }
+  }
+
+  async function startTFListening() {
+    stopTFListening();
+    if (!tfXfer) return;
+    try {
+      await tfXfer.listen(function(result) {
+        var scores = Array.from(result.scores);
+        var maxScore = Math.max.apply(null, scores);
+        var note = TF_LABELS[scores.indexOf(maxScore)];
+        if (maxScore > TF_THRESH && note !== '_background_noise_') triggerMicNote(note);
+      }, { probabilityThreshold: TF_THRESH, overlapFactor: 0.5 });
+      tfListening = true;
+      micStatus.textContent = "🎤 diga la nota...";
+      micRecalBtn.hidden = false;
+      micBtn.textContent = "🔴 Escoltant...";
+    } catch(err) { console.warn('[TF listen]', err); }
+  }
+
+  function stopTFListening() {
+    if (tfXfer && tfListening) {
+      try { tfXfer.stopListening(); } catch(e2) {}
+      tfListening = false;
+    }
+    if (micRecalBtn) micRecalBtn.hidden = true;
+  }
+
+  // Calibració — listeners s'afegeixen la 1a vegada que s'obre el modal
+  const TF_CAL_STEPS = [...TF_NOTES, '_background_noise_'];
+  const TF_CAL_NAMES = { do:'DO', re:'RE', mi:'MI', fa:'FA', sol:'SOL', la:'LA', si:'SI', '_background_noise_':'🔇' };
+  const TF_EXAMPLES  = 4;
+  var calStep = 0, calCounts = {}, calListenersAdded = false;
+
+  function showCal() {
+    calStep = 0; calCounts = {};
+    var recArea  = document.getElementById('vcal-record-area');
+    var trainArea= document.getElementById('vcal-training-area');
+    var cancelBtn= document.getElementById('vcal-cancel-btn');
+    if (recArea)   recArea.hidden   = false;
+    if (trainArea) trainArea.hidden = true;
+    if (cancelBtn) cancelBtn.hidden = false;
+    if (vcalOverlay) vcalOverlay.hidden = false;
+    renderCalStep();
+    if (!calListenersAdded) {
+      calListenersAdded = true;
+      var recBtn  = document.getElementById('vcal-record-btn');
+      var skipBtn = document.getElementById('vcal-skip-btn');
+      var canBtn  = document.getElementById('vcal-cancel-btn');
+      if (recBtn)  recBtn.addEventListener('click', vcalRecord);
+      if (skipBtn) skipBtn.addEventListener('click', function() {
+        calStep++;
+        if (calStep >= TF_CAL_STEPS.length) vcalTrain();
+        else { renderCalStep(); var rb = document.getElementById('vcal-record-btn'); if (rb) rb.disabled = false; }
+      });
+      if (canBtn)  canBtn.addEventListener('click', hideCal);
+    }
+  }
+
+  function hideCal() { if (vcalOverlay) vcalOverlay.hidden = true; }
+
+  function renderCalStep() {
+    var label   = TF_CAL_STEPS[calStep];
+    var isNoise = label === '_background_noise_';
+    var done    = calCounts[label] || 0;
+    var sc = document.getElementById('vcal-step-counter');
+    var nb = document.getElementById('vcal-note-big');
+    var ins= document.getElementById('vcal-instruction');
+    var dots=document.getElementById('vcal-dots');
+    var btn = document.getElementById('vcal-record-btn');
+    if (sc)  sc.textContent  = 'Pas ' + (calStep + 1) + ' / ' + TF_CAL_STEPS.length;
+    if (nb)  nb.textContent  = TF_CAL_NAMES[label];
+    if (ins) ins.textContent = isNoise
+      ? 'Queda\'t en silenci ' + TF_EXAMPLES + ' vegades'
+      : 'Di "' + label.toUpperCase() + '" ' + TF_EXAMPLES + ' vegades';
+    if (dots) {
+      dots.innerHTML = '';
+      for (var i = 0; i < TF_EXAMPLES; i++) {
+        var d = document.createElement('span');
+        d.className = 'vcal-dot' + (i < done ? ' filled' : '');
+        dots.appendChild(d);
+      }
+    }
+    if (btn) {
+      btn.textContent = isNoise ? '🔇 Grava silenci' : '🎤 Grava';
+      btn.disabled    = done >= TF_EXAMPLES;
+      btn.classList.remove('recording');
+    }
+  }
+
+  async function vcalRecord() {
+    var label = TF_CAL_STEPS[calStep];
+    var btn   = document.getElementById('vcal-record-btn');
+    if (!btn) return;
+    btn.disabled = true;
+    btn.textContent = 'PARLA! 🔴';
+    btn.classList.add('recording');
+    if (!tfXfer) tfXfer = tfBase.createTransfer('veu-' + currentProfile());
+    await new Promise(function(r) { setTimeout(r, 350); });
+    try {
+      await tfXfer.collectExample(label);
+      calCounts[label] = (calCounts[label] || 0) + 1;
+      renderCalStep();
+      if (calCounts[label] >= TF_EXAMPLES) setTimeout(vcalAdvance, 700);
+      else btn.disabled = false;
+    } catch(err) {
+      btn.classList.remove('recording');
+      btn.textContent = '⚠️ Reintenta';
+      btn.disabled = false;
+      console.warn('[TF collect]', err);
+    }
+  }
+
+  function vcalAdvance() {
+    calStep++;
+    if (calStep >= TF_CAL_STEPS.length) vcalTrain();
+    else {
+      renderCalStep();
+      var rb = document.getElementById('vcal-record-btn');
+      if (rb) rb.disabled = false;
+    }
+  }
+
+  async function vcalTrain() {
+    var recArea  = document.getElementById('vcal-record-area');
+    var trainArea= document.getElementById('vcal-training-area');
+    var cancelBtn= document.getElementById('vcal-cancel-btn');
+    var bar = document.getElementById('vcal-train-bar');
+    var txt = document.getElementById('vcal-train-text');
+    if (recArea)   recArea.hidden   = true;
+    if (trainArea) trainArea.hidden = false;
+    if (cancelBtn) cancelBtn.hidden = true;
+    var EPOCHS = 30;
+    try {
+      await tfXfer.train({
+        epochs: EPOCHS,
+        callback: { onEpochEnd: function(ep) {
+          var pct = Math.round((ep + 1) / EPOCHS * 100);
+          if (bar) bar.style.width = pct + '%';
+          if (txt) txt.textContent = 'Entrenant... ' + pct + '%';
+        }}
+      });
+      await tfXfer.save(voiceModelKey());
+      if (txt) txt.textContent = 'Llest! Veu guardada.';
+      if (bar) bar.style.width = '100%';
+      setTimeout(async function() {
+        hideCal();
+        micActive = true;
+        await startTFListening();
+      }, 1800);
+    } catch(err) {
+      if (txt) txt.textContent = 'Error: ' + err.message;
+      if (cancelBtn) cancelBtn.hidden = false;
+      console.error('[TF train]', err);
+    }
+  }
+
+  async function startMic() {
+    micBtn.classList.add("active");
+    micBtn.textContent = "⏳ Carregant...";
+    micStatus.textContent = "";
+    micLastMatchAt = 0;
+    var tfOk = await loadTFLibs();
+    if (tfOk && await ensureBaseRecognizer()) {
+      if (await hasStoredModel() && await tryLoadModel()) {
+        micActive = true;
+        await startTFListening();
+      } else {
+        micBtn.textContent = "🎤 Veu";
+        micBtn.classList.remove("active");
+        showCal();
+      }
+      return;
+    }
+    micActive = true;
+    startSpeechAPI();
+  }
+
+  function stopMic() {
+    micActive = false; micLastMatchAt = 0;
+    stopTFListening(); stopSpeechAPI();
+    micBtn.classList.remove("active"); micBtn.textContent = "🎤 Veu";
+    micStatus.textContent = ""; micStatus.classList.remove("detected");
+  }
+
+  // Speech API (fallback)
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
   let speechRec  = null;
   let speechLive = false;
@@ -1142,88 +1380,63 @@
     if (btn) btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
   }
 
-  function initSpeech() {
-    if (!SpeechRec) return;
-    speechRec = new SpeechRec();
-    // it-IT: l'italià és l'origen del solfège (do/re/mi/fa/sol/la/si).
-    // El model de veu italià coneix PERFECTAMENT totes les síl·labes,
-    // incloent "do" que en espanyol/català no és paraula comuna.
-    speechRec.lang = "it-IT";
-    speechRec.continuous = false;   // single-shot: finalitza de pressa per paraules soltes
-    speechRec.interimResults = true;
-    speechRec.maxAlternatives = 3;
-    speechRec.onresult = (e) => {
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (!e.results[i].isFinal) {
-          const interim = e.results[i][0] ? e.results[i][0].transcript.toLowerCase().trim() : "";
-          if (interim) micStatus.textContent = "🎤 " + interim;
-          continue;
-        }
-        // Final: reinicia la sessió IMMEDIATAMENT per minimitzar el paro
-        if (speechLive) try { speechRec.stop(); } catch(_) {}
-        // Comprova totes les alternatives
-        for (let j = 0; j < e.results[i].length; j++) {
-          const note = matchNoteCA(e.results[i][j].transcript);
-          if (note) { triggerMicNote(note); return; }
-        }
-        // Res reconegut: mostra el que ha sentit
-        const heard = e.results[i][0] ? e.results[i][0].transcript.toLowerCase().trim() : "";
-        if (heard) micStatus.textContent = "? '" + heard + "'";
-      }
-    };
-    speechRec.onerror = (e) => {
-      if (e.error === "no-speech") {
-        micStatus.textContent = "🎤 diga la nota...";
-        return;
-      }
-      if (e.error === "network") {
-        micStatus.textContent = "⚠️ Cal connexió internet";
-      } else if (e.error === "not-allowed") {
-        micStatus.textContent = "⚠️ Permís micròfon denegat";
-        stopMic(); return;
-      } else {
-        micStatus.textContent = "⚠️ " + e.error;
-      }
-    };
-    speechRec.onend = () => {
-      if (speechLive) try { speechRec.start(); } catch(_) {}
-    };
-  }
-
-  function startMic() {
+  function startSpeechAPI() {
     if (!SpeechRec) {
       micStatus.textContent = "⚠️ Usa Chrome o Edge";
-      return;
+      micActive = false; micBtn.classList.remove("active"); micBtn.textContent = "🎤 Veu"; return;
     }
-    if (!speechRec) initSpeech();
-    micActive = true;
+    if (!speechRec) {
+      speechRec = new SpeechRec();
+      speechRec.lang = "it-IT";
+      speechRec.continuous = false;
+      speechRec.interimResults = true;
+      speechRec.maxAlternatives = 3;
+      speechRec.onresult = function(e) {
+        for (var i = e.resultIndex; i < e.results.length; i++) {
+          if (!e.results[i].isFinal) {
+            var interim = e.results[i][0] ? e.results[i][0].transcript.toLowerCase().trim() : "";
+            if (interim) micStatus.textContent = "🎤 " + interim;
+            continue;
+          }
+          if (speechLive) try { speechRec.stop(); } catch(ex) {}
+          for (var j = 0; j < e.results[i].length; j++) {
+            var note = matchNoteCA(e.results[i][j].transcript);
+            if (note) { triggerMicNote(note); return; }
+          }
+          var heard = e.results[i][0] ? e.results[i][0].transcript.toLowerCase().trim() : "";
+          if (heard) micStatus.textContent = "? '" + heard + "'";
+        }
+      };
+      speechRec.onerror = function(e) {
+        if (e.error === "no-speech") { micStatus.textContent = "🎤 diga la nota..."; return; }
+        if (e.error === "not-allowed") { micStatus.textContent = "⚠️ Permís micròfon denegat"; stopMic(); return; }
+        micStatus.textContent = "⚠️ " + e.error;
+      };
+      speechRec.onend = function() { if (speechLive) try { speechRec.start(); } catch(ex) {} };
+    }
     speechLive = true;
-    micLastMatchAt = 0;
-    micBtn.classList.add("active");
     micBtn.textContent = "🔴 Veu activa";
     micStatus.textContent = "🎤 diga la nota...";
-    try { speechRec.start(); } catch(e) {
-      micStatus.textContent = "⚠️ " + e.message;
-      stopMic();
-    }
+    try { speechRec.start(); } catch(e) { micStatus.textContent = "⚠️ " + e.message; }
   }
 
-  function stopMic() {
-    micActive  = false;
+  function stopSpeechAPI() {
     speechLive = false;
-    if (speechRec) { try { speechRec.stop(); } catch(_) {} }
-    micBtn.classList.remove("active");
-    micBtn.textContent = "🎤 Veu";
-    micStatus.textContent = "";
-    micStatus.classList.remove("detected");
+    if (speechRec) try { speechRec.stop(); } catch(ex) {}
   }
 
-  micBtn.addEventListener("click", () => {
-    if (micActive) stopMic();
-    else startMic();
+  micBtn.addEventListener("click", function() {
+    if (micActive) stopMic(); else startMic();
   });
 
-  document.addEventListener("visibilitychange", () => {
+  if (micRecalBtn) {
+    micRecalBtn.addEventListener("click", function() {
+      stopMic();
+      showCal();
+    });
+  }
+
+  document.addEventListener("visibilitychange", function() {
     if (document.hidden && micActive) stopMic();
   });
 
