@@ -1149,11 +1149,13 @@
     speechRec.maxAlternatives = 5;
     speechRec.onresult = (e) => {
       for (let i = e.resultIndex; i < e.results.length; i++) {
-        // Mostra en temps real el que sent (interim) — debug visual
-        if (!e.results[i].isFinal && e.results[i][0]) {
-          const interim = e.results[i][0].transcript.toLowerCase().trim();
+        if (!e.results[i].isFinal) {
+          // Interim: mostrar però NO disparar (poden ser incorrectes)
+          const interim = e.results[i][0] ? e.results[i][0].transcript.toLowerCase().trim() : "";
           if (interim) micStatus.textContent = "🎤 " + interim;
+          continue;
         }
+        // Final: ara sí, comprovem totes les alternatives
         for (let j = 0; j < e.results[i].length; j++) {
           const note = matchNoteCA(e.results[i][j].transcript);
           if (note) { triggerMicNote(note); return; }
