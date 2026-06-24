@@ -1093,100 +1093,32 @@
   });
   songSelect.addEventListener("change", startRound);
 
-  // ══════════════════════════════════════════════════════════════════════
-  // DETECCIÓ DE VEU — TF.js Speech Commands (model local per perfil)
-  // Fallback automàtic: Web Speech API (it-IT, single-shot)
-  // ══════════════════════════════════════════════════════════════════════
-  const micBtn      = document.getElementById("mic-btn");
-  const micStatus   = document.getElementById("mic-status");
-  const micRecalBtn = document.getElementById("mic-recal-btn");
-  const vcalOverlay = document.getElementById("voice-cal-overlay");
-
-  let micActive      = false;
+  // ---------- DETECCIÓ DE VEU (WEB SPEECH API) ----------
+  // Estratègia: únicament Speech API (sense AudioContext ni pitch detection).
+  // Motiu: pitchy/YIN detecten freqüències i s'equivoquen sistemàticament amb
+  // harmònics de la veu humana (Do→Fa, Fa→Si...). La Speech API reconeix
+  // la PARAULA "do", "re"... i no té aquest problema.
+  const micBtn    = document.getElementById("mic-btn");
+  const micStatus = document.getElementById("mic-status");
+  let micActive   = false;
   let micLastMatchAt = 0;
 
-  // TF.js state
-  let tfBase      = null;
-  let tfXfer      = null;
-  let tfListening = false;
-  const TF_NOTES  = ['do','re','mi','fa','sol','la','si'];
-  const TF_LABELS = [...TF_NOTES, '_background_noise_'];
-  const TF_THRESH = 0.80;
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let speechRec  = null;
+  let speechLive = false;
 
-  function voiceModelKey() { return 'indexeddb://veu-' + currentProfile(); }
-
-  async function loadTFLibs() {
-    if (window.speechCommands) return true;
-    return new Promise(resolve => {
-      const s1 = document.createElement('script');
-      s1.src = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js';
-      s1.onload = () => {
-        const s2 = document.createElement('script');
-        s2.src = 'https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js';
-        s2.onload = () => resolve(true);
-        s2.onerror = () => resolve(false);
-        document.head.appendChild(s2);
-      };
-      s1.onerror = () => resolve(false);
-      document.head.appendChild(s1);
-    });
-  }
-
-  async function ensureBaseRecognizer() {
-    if (tfBase) return true;
-    try {
-      micStatus.textContent = "⏳ Carregant model (1a vegada ~20 MB)...";
-      tfBase = window.speechCommands.create('BROWSER_FFT');
-      const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 40000));
-      await Promise.race([tfBase.ensureModelLoaded(), timeout]);
-      return true;
-    } catch(e) {
-      tfBase = null;
-      micStatus.textContent = e.message === 'timeout'
-        ? "⚠️ Temps esgotat. Comprova la connexió."
-        : "⚠️ Cal internet la primera vegada";
-      console.warn('[TF base]', e);
-      return false;
-    }
-  }
-
-  async function hasStoredModel() {
-    try {
-      const models = await tf.io.listModels();
-      return voiceModelKey() in models;
-    } catch(_e) { return false; }
-  }
-
-  async function tryLoadModel() {
-    if (!tfBase) return false;
-    try {
-      if (tfXfer) { try { tfXfer.stopListening(); } catch(_) {} }
-      tfXfer = tfBase.createTransfer('veu-' + currentProfile());
-      await tfXfer.load(voiceModelKey());
-      return true;
-    } catch(e) { tfXfer = null; return false; }
-  }
-
-  async function startTFListening() {
-    stopTFListening();
-    if (!tfXfer) return;
-    try {
-      await tfXfer.listen(result => {
-        const scores = Array.from(result.scores);
-        const maxScore = Math.max(...scores);
-        const note = TF_LABELS[scores.indexOf(maxScore)];
-        if (maxScore > TF_THRESH && note !== '_background_noise_') triggerMicNote(note);
-      }, { probabilityThreshold: TF_THRESH, overlapFactor: 0.5 });
-      tfListening = true;
-      micStatus.textContent = "🎤 diga la nota...";
-      micRecalBtn.hidden = false;
-      micBtn.textContent = "🔴 Escoltant...";
-    } catch(e) { console.warn('[TF listen]', e); }
-  }
-
-  function stopTFListening() {
-    if (tfXfer && tfListening) { try { tfXfer.stopListening(); } catch(_) {} tfListening = false; }
-    micRecalBtn.hidden = true;
+  function matchNoteCA(text) {
+    const t = " " + text.toLowerCase().replace(/[^a-z]/g, " ") + " ";
+    if (t.includes(" sol ")) return "sol";
+    if (t.includes(" si "))  return "si";
+    // "do" sovint transcrit com "dos"/"don"/"doh" per la Speech API en espanyol
+    if (/ do[snhx]? /.test(t)) return "do";
+    if (t.includes(" re "))  return "re";
+    if (t.includes(" mi "))  return "mi";
+    // "fa" a vegades transcrit com "ja"/"ha" — afegim alternatives catalanes
+    if (t.includes(" fa ") || t.includes(" ja ")) return "fa";
+    if (t.includes(" la "))  return "la";
+    return null;
   }
 
   function triggerMicNote(noteCa) {
@@ -1196,7 +1128,7 @@
     micStatus.textContent = "✓ " + noteCa.toUpperCase();
     micStatus.classList.add("detected");
     setTimeout(() => {
-      if (micActive) micStatus.textContent = "🎤 diga la nota...";
+      if (micActive) { micStatus.textContent = "🎤 diga la nota..."; }
       micStatus.classList.remove("detected");
     }, 800);
     let btn = null;
@@ -1210,210 +1142,90 @@
     if (btn) btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
   }
 
-  // Calibració
-  const CAL_STEPS = [...TF_NOTES, '_background_noise_'];
-  const CAL_NAMES = { do:'DO', re:'RE', mi:'MI', fa:'FA', sol:'SOL', la:'LA', si:'SI', '_background_noise_':'🔇' };
-  const EXAMPLES  = 4;
-  let calStep = 0, calCounts = {};
-
-  function showCal() {
-    calStep = 0; calCounts = {};
-    document.getElementById('vcal-record-area').hidden   = false;
-    document.getElementById('vcal-training-area').hidden = true;
-    document.getElementById('vcal-cancel-btn').hidden    = false;
-    vcalOverlay.hidden = false;
-    renderCalStep();
-  }
-
-  function hideCal() { vcalOverlay.hidden = true; }
-
-  function renderCalStep() {
-    const label   = CAL_STEPS[calStep];
-    const isNoise = label === '_background_noise_';
-    const done    = calCounts[label] || 0;
-    document.getElementById('vcal-step-counter').textContent = 'Pas ' + (calStep + 1) + ' / ' + CAL_STEPS.length;
-    document.getElementById('vcal-note-big').textContent     = CAL_NAMES[label];
-    document.getElementById('vcal-instruction').textContent  = isNoise
-      ? 'Queda\'t en silenci ' + EXAMPLES + ' vegades'
-      : 'Di "' + label.toUpperCase() + '" ' + EXAMPLES + ' vegades';
-    const dots = document.getElementById('vcal-dots');
-    dots.innerHTML = '';
-    for (let i = 0; i < EXAMPLES; i++) {
-      const d = document.createElement('span');
-      d.className = 'vcal-dot' + (i < done ? ' filled' : '');
-      dots.appendChild(d);
-    }
-    const btn = document.getElementById('vcal-record-btn');
-    btn.textContent = isNoise ? '🔇 Grava silenci' : '🎙️ Grava';
-    btn.disabled    = done >= EXAMPLES;
-    btn.classList.remove('recording');
-  }
-
-  async function vcalRecord() {
-    const label = CAL_STEPS[calStep];
-    const btn   = document.getElementById('vcal-record-btn');
-    btn.disabled = true;
-    btn.textContent = 'PARLA! 🔴';
-    btn.classList.add('recording');
-    if (!tfXfer) tfXfer = tfBase.createTransfer('veu-' + currentProfile());
-    await new Promise(r => setTimeout(r, 350));
-    try {
-      await tfXfer.collectExample(label);
-      calCounts[label] = (calCounts[label] || 0) + 1;
-      renderCalStep();
-      if (calCounts[label] >= EXAMPLES) setTimeout(vcalAdvance, 700);
-      else btn.disabled = false;
-    } catch(e) {
-      btn.classList.remove('recording');
-      btn.textContent = '⚠️ Reintenta';
-      btn.disabled = false;
-      console.warn('[TF collect]', e);
-    }
-  }
-
-  function vcalAdvance() {
-    calStep++;
-    if (calStep >= CAL_STEPS.length) vcalTrain();
-    else { renderCalStep(); document.getElementById('vcal-record-btn').disabled = false; }
-  }
-
-  async function vcalTrain() {
-    document.getElementById('vcal-record-area').hidden   = true;
-    document.getElementById('vcal-training-area').hidden = false;
-    document.getElementById('vcal-cancel-btn').hidden    = true;
-    const bar = document.getElementById('vcal-train-bar');
-    const txt = document.getElementById('vcal-train-text');
-    const EPOCHS = 30;
-    try {
-      await tfXfer.train({
-        epochs: EPOCHS,
-        callback: { onEpochEnd: (ep) => {
-          const pct = Math.round((ep + 1) / EPOCHS * 100);
-          bar.style.width = pct + '%';
-          txt.textContent = 'Entrenant... ' + pct + '%';
-        }}
-      });
-      await tfXfer.save(voiceModelKey());
-      txt.textContent = 'Llest! La teva veu ha quedat guardada.';
-      bar.style.width = '100%';
-      setTimeout(async () => { hideCal(); micActive = true; await startTFListening(); }, 1800);
-    } catch(e) {
-      txt.textContent = 'Error durant l\'entrenament: ' + e.message;
-      document.getElementById('vcal-cancel-btn').hidden = false;
-      console.error('[TF train]', e);
-    }
-  }
-
-  async function startMic() {
-    micBtn.classList.add("active");
-    micBtn.textContent = "⏳ Carregant...";
-    micStatus.textContent = "";
-    micLastMatchAt = 0;
-    const tfOk = await loadTFLibs();
-    if (tfOk && await ensureBaseRecognizer()) {
-      if (await hasStoredModel() && await tryLoadModel()) {
-        micActive = true;
-        await startTFListening();
-      } else {
-        micBtn.textContent = "🎤 Veu"; micBtn.classList.remove("active");
-        showCal();
+  function initSpeech() {
+    if (!SpeechRec) return;
+    speechRec = new SpeechRec();
+    // it-IT: l'italià és l'origen del solfège (do/re/mi/fa/sol/la/si).
+    // El model de veu italià coneix PERFECTAMENT totes les síl·labes,
+    // incloent "do" que en espanyol/català no és paraula comuna.
+    speechRec.lang = "it-IT";
+    speechRec.continuous = false;   // single-shot: finalitza de pressa per paraules soltes
+    speechRec.interimResults = true;
+    speechRec.maxAlternatives = 3;
+    speechRec.onresult = (e) => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (!e.results[i].isFinal) {
+          const interim = e.results[i][0] ? e.results[i][0].transcript.toLowerCase().trim() : "";
+          if (interim) micStatus.textContent = "🎤 " + interim;
+          continue;
+        }
+        // Final: reinicia la sessió IMMEDIATAMENT per minimitzar el paro
+        if (speechLive) try { speechRec.stop(); } catch(_) {}
+        // Comprova totes les alternatives
+        for (let j = 0; j < e.results[i].length; j++) {
+          const note = matchNoteCA(e.results[i][j].transcript);
+          if (note) { triggerMicNote(note); return; }
+        }
+        // Res reconegut: mostra el que ha sentit
+        const heard = e.results[i][0] ? e.results[i][0].transcript.toLowerCase().trim() : "";
+        if (heard) micStatus.textContent = "? '" + heard + "'";
       }
+    };
+    speechRec.onerror = (e) => {
+      if (e.error === "no-speech") {
+        micStatus.textContent = "🎤 diga la nota...";
+        return;
+      }
+      if (e.error === "network") {
+        micStatus.textContent = "⚠️ Cal connexió internet";
+      } else if (e.error === "not-allowed") {
+        micStatus.textContent = "⚠️ Permís micròfon denegat";
+        stopMic(); return;
+      } else {
+        micStatus.textContent = "⚠️ " + e.error;
+      }
+    };
+    speechRec.onend = () => {
+      if (speechLive) try { speechRec.start(); } catch(_) {}
+    };
+  }
+
+  function startMic() {
+    if (!SpeechRec) {
+      micStatus.textContent = "⚠️ Usa Chrome o Edge";
       return;
     }
+    if (!speechRec) initSpeech();
     micActive = true;
-    startSpeechAPI();
+    speechLive = true;
+    micLastMatchAt = 0;
+    micBtn.classList.add("active");
+    micBtn.textContent = "🔴 Veu activa";
+    micStatus.textContent = "🎤 diga la nota...";
+    try { speechRec.start(); } catch(e) {
+      micStatus.textContent = "⚠️ " + e.message;
+      stopMic();
+    }
   }
 
   function stopMic() {
-    micActive = false; micLastMatchAt = 0;
-    stopTFListening(); stopSpeechAPI();
-    micBtn.classList.remove("active"); micBtn.textContent = "🎤 Veu";
-    micStatus.textContent = ""; micStatus.classList.remove("detected");
-  }
-
-  // Speech API (fallback quan TF.js no disponible)
-  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let speechRec = null, speechLive = false;
-
-  function matchNoteCA(text) {
-    const t = " " + text.toLowerCase().replace(/[^a-z]/g, " ") + " ";
-    if (t.includes(" sol ")) return "sol";
-    if (t.includes(" si "))  return "si";
-    if (/ do[snhx]? /.test(t)) return "do";
-    if (t.includes(" re "))  return "re";
-    if (t.includes(" mi "))  return "mi";
-    if (t.includes(" fa ") || t.includes(" ja ")) return "fa";
-    if (t.includes(" la "))  return "la";
-    return null;
-  }
-
-  function startSpeechAPI() {
-    if (!SpeechRec) {
-      micStatus.textContent = "⚠️ Usa Chrome/Edge";
-      micActive = false; micBtn.classList.remove("active"); micBtn.textContent = "🎤 Veu"; return;
-    }
-    if (!speechRec) {
-      speechRec = new SpeechRec();
-      speechRec.lang = "it-IT"; speechRec.continuous = false;
-      speechRec.interimResults = true; speechRec.maxAlternatives = 3;
-      speechRec.onresult = (e) => {
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (!e.results[i].isFinal) {
-            const t = e.results[i][0]?.transcript.toLowerCase().trim();
-            if (t) micStatus.textContent = "🎤 " + t; continue;
-          }
-          if (speechLive) try { speechRec.stop(); } catch(_) {}
-          for (let j = 0; j < e.results[i].length; j++) {
-            const note = matchNoteCA(e.results[i][j].transcript);
-            if (note) { triggerMicNote(note); return; }
-          }
-          const h = e.results[i][0]?.transcript.toLowerCase().trim();
-          if (h) micStatus.textContent = "? '" + h + "'";
-        }
-      };
-      speechRec.onerror = (e) => {
-        if (e.error === "no-speech") { micStatus.textContent = "🎤 diga..."; return; }
-        micStatus.textContent = "⚠️ " + e.error;
-      };
-      speechRec.onend = () => { if (speechLive) try { speechRec.start(); } catch(_) {} };
-    }
-    speechLive = true;
-    micBtn.textContent = "🔴 Veu activa";
-    micStatus.textContent = "🎤 [Speech] diga la nota...";
-    try { speechRec.start(); } catch(e) { micStatus.textContent = "⚠️ " + e.message; }
-  }
-
-  function stopSpeechAPI() {
+    micActive  = false;
     speechLive = false;
-    if (speechRec) try { speechRec.stop(); } catch(_) {}
+    if (speechRec) { try { speechRec.stop(); } catch(_) {} }
+    micBtn.classList.remove("active");
+    micBtn.textContent = "🎤 Veu";
+    micStatus.textContent = "";
+    micStatus.classList.remove("detected");
   }
 
-  // Listeners
-  micBtn.addEventListener("click", () => { if (micActive) stopMic(); else startMic(); });
-
-  micRecalBtn.addEventListener("click", () => {
-    stopMic();
-    if (!window.speechCommands) loadTFLibs().then(() => ensureBaseRecognizer());
-    else if (!tfBase) ensureBaseRecognizer();
-    showCal();
+  micBtn.addEventListener("click", () => {
+    if (micActive) stopMic();
+    else startMic();
   });
-
-  document.getElementById('vcal-record-btn').addEventListener('click', vcalRecord);
-  document.getElementById('vcal-skip-btn').addEventListener('click', () => {
-    calStep++;
-    if (calStep >= CAL_STEPS.length) vcalTrain();
-    else { renderCalStep(); document.getElementById('vcal-record-btn').disabled = false; }
-  });
-  document.getElementById('vcal-cancel-btn').addEventListener('click', hideCal);
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden && micActive) stopMic();
   });
-
-  // Precàrrega TF.js en segon pla (3s després d'inici) per agilitzar el primer press del mic
-  setTimeout(() => {
-    loadTFLibs().then(ok => { if (ok) ensureBaseRecognizer(); });
-  }, 3000);
 
   window.addEventListener("resize", () => {
     if (document.getElementById("screen-train").classList.contains("active") && sequence.length > 0) {
