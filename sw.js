@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v82-tfjs-preload";
+const CACHE = "lectura-notes-v83-no-bom";
 const FILES = [
   "./",
   "./index.html",
@@ -32,8 +32,8 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
-  // Xarxa-primer amb `cache: "no-cache"` → sempre revalida amb servidor.
-  // Només cau al caché si la xarxa falla (offline).
+  // Xarxa-primer amb `cache: "no-cache"` ? sempre revalida amb servidor.
+  // Nom�s cau al cach� si la xarxa falla (offline).
   event.respondWith(
     fetch(req, { cache: "no-cache" })
       .then((res) => {

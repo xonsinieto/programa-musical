@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
   const VF = Vex.Flow;
 
   // ======================================================
@@ -1154,7 +1154,7 @@
     try {
       const models = await tf.io.listModels();
       return voiceModelKey() in models;
-    } catch { return false; }
+    } catch(_e) { return false; }
   }
 
   async function tryLoadModel() {
