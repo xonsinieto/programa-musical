@@ -1149,7 +1149,7 @@
     // El model de veu italià coneix PERFECTAMENT totes les síl·labes,
     // incloent "do" que en espanyol/català no és paraula comuna.
     speechRec.lang = "it-IT";
-    speechRec.continuous = true;    // continu: sense parons entre notes
+    speechRec.continuous = false;   // single-shot: finalitza de pressa per paraules soltes
     speechRec.interimResults = true;
     speechRec.maxAlternatives = 3;
     speechRec.onresult = (e) => {
@@ -1159,12 +1159,14 @@
           if (interim) micStatus.textContent = "🎤 " + interim;
           continue;
         }
-        // Final: comprova totes les alternatives
+        // Final: reinicia la sessió IMMEDIATAMENT per minimitzar el paro
+        if (speechLive) try { speechRec.stop(); } catch(_) {}
+        // Comprova totes les alternatives
         for (let j = 0; j < e.results[i].length; j++) {
           const note = matchNoteCA(e.results[i][j].transcript);
           if (note) { triggerMicNote(note); return; }
         }
-        // Res reconegut: mostra el que ha sentit (ajuda a diagnosticar)
+        // Res reconegut: mostra el que ha sentit
         const heard = e.results[i][0] ? e.results[i][0].transcript.toLowerCase().trim() : "";
         if (heard) micStatus.textContent = "? '" + heard + "'";
       }
