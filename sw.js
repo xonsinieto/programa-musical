@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v85-tfjs-safe";
+const CACHE = "lectura-notes-v86-timeout";
 const FILES = [
   "./",
   "./index.html",

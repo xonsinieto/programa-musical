@@ -1129,13 +1129,19 @@
   async function ensureBaseRecognizer() {
     if (tfBase) return true;
     try {
-      micStatus.textContent = "⏳ Carregant model (~20 MB, 1a vegada)...";
+      micStatus.textContent = "⏳ Carregant model (~20 MB)...";
       tfBase = window.speechCommands.create('BROWSER_FFT');
-      await tfBase.ensureModelLoaded();
+      var loadPromise = tfBase.ensureModelLoaded();
+      var timeoutPromise = new Promise(function(_, rej) {
+        setTimeout(function() { rej(new Error('timeout')); }, 25000);
+      });
+      await Promise.race([loadPromise, timeoutPromise]);
       return true;
     } catch(err) {
       tfBase = null;
-      micStatus.textContent = "⚠️ Cal internet la primera vegada";
+      micStatus.textContent = err.message === 'timeout'
+        ? "⚠️ Model massa lent. Usant reconeixement de veu estàndard..."
+        : "⚠️ Error carregant model. Usant veu estàndard...";
       console.warn('[TF base]', err);
       return false;
     }
