@@ -1135,13 +1135,16 @@
   async function ensureBaseRecognizer() {
     if (tfBase) return true;
     try {
-      micStatus.textContent = "⏳ Carregant model (1a vegada ~6 MB)...";
+      micStatus.textContent = "⏳ Carregant model (1a vegada ~20 MB)...";
       tfBase = window.speechCommands.create('BROWSER_FFT');
-      await tfBase.ensureModelLoaded();
+      const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 40000));
+      await Promise.race([tfBase.ensureModelLoaded(), timeout]);
       return true;
     } catch(e) {
       tfBase = null;
-      micStatus.textContent = "⚠️ Cal internet la primera vegada";
+      micStatus.textContent = e.message === 'timeout'
+        ? "⚠️ Temps esgotat. Comprova la connexió."
+        : "⚠️ Cal internet la primera vegada";
       console.warn('[TF base]', e);
       return false;
     }
@@ -1406,6 +1409,11 @@
   document.addEventListener("visibilitychange", () => {
     if (document.hidden && micActive) stopMic();
   });
+
+  // Precàrrega TF.js en segon pla (3s després d'inici) per agilitzar el primer press del mic
+  setTimeout(() => {
+    loadTFLibs().then(ok => { if (ok) ensureBaseRecognizer(); });
+  }, 3000);
 
   window.addEventListener("resize", () => {
     if (document.getElementById("screen-train").classList.contains("active") && sequence.length > 0) {
