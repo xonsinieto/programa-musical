@@ -1093,120 +1093,21 @@
   });
   songSelect.addEventListener("change", startRound);
 
-  // ---------- DETECCIÓ DE PITCH (VEU / INSTRUMENT) ----------
+  // ---------- DETECCIÓ DE VEU (WEB SPEECH API) ----------
+  // Estratègia: únicament Speech API (sense AudioContext ni pitch detection).
+  // Motiu: pitchy/YIN detecten freqüències i s'equivoquen sistemàticament amb
+  // harmònics de la veu humana (Do→Fa, Fa→Si...). La Speech API reconeix
+  // la PARAULA "do", "re"... i no té aquest problema.
   const micBtn    = document.getElementById("mic-btn");
   const micStatus = document.getElementById("mic-status");
   let micActive   = false;
-  let micStream   = null;
-  let micCtx      = null;
-  let micAnalyser = null;
-  let micRAF      = null;
-  let micBuffer   = null;
   let micLastMatchAt = 0;
 
-  const NOTE_CLASS_BY_SEMITONE = {
-    0: "do",  2: "re",  4: "mi",  5: "fa",  7: "sol", 9: "la", 11: "si"
-  };
-  const NATURAL_SEMITONES = [0, 2, 4, 5, 7, 9, 11];
-
-  // ── YIN pitch detection ────────────────────────────────────────────────────
-  // Algorisme professional (Audacity, Melodyne). Molt millor que autocorrelació
-  // per veu humana: detecta el to fonamental fins i tot amb harmònics complexos.
-  // Retorna [freq_Hz, confiança_0_1]. Confiança >0.5 ja és fiable per veu.
-  // ── pitchy (MPM) — biblioteca externa, es carrega async al primer ús ────────
-  // https://github.com/ianprime0509/pitchy (Jake Archibald / Ian Prime)
-  let pitchyDet = null; // PitchDetector instància, o null fins que carregui
-
-  async function loadPitchy(bufSize) {
-    if (pitchyDet) return;
-    try {
-      const { PitchDetector } = await import("https://cdn.jsdelivr.net/npm/pitchy@4.1.0/+esm");
-      pitchyDet = PitchDetector.forFloat32Array(bufSize);
-      pitchyDet.minVolumeDecibels = -40;
-      console.log("[PITCH] pitchy MPM carregat OK");
-    } catch(e) {
-      console.warn("[PITCH] pitchy no disponible, usant YIN propi:", e.message);
-    }
-  }
-
-  // ── YIN (fallback quan pitchy no estigui disponible) ───────────────────────
-  // Versió corregida: recull TOTS els mínims locals i tria el DARRER
-  // (tau més gran = freqüència més baixa = to fonamental).
-  // Els harmònics creen mínims a tau/2, tau/3 → tau MENOR → descartats.
-  function yinPitch(buffer, sampleRate) {
-    const N = buffer.length;
-    const W = Math.floor(N / 2);
-    const THRESH = 0.15;
-
-    const diff = new Float32Array(W);
-    for (let tau = 1; tau < W; tau++) {
-      let s = 0;
-      for (let i = 0; i < W; i++) { const d = buffer[i] - buffer[i + tau]; s += d * d; }
-      diff[tau] = s;
-    }
-
-    const cmndf = new Float32Array(W);
-    cmndf[0] = 1;
-    let run = 0;
-    for (let tau = 1; tau < W; tau++) {
-      run += diff[tau];
-      cmndf[tau] = run > 0 ? diff[tau] * tau / run : 1;
-    }
-
-    // Rang vocal: 75 Hz–1050 Hz cobreix tots els cantants (baix fins a soprano)
-    const tauMin = Math.ceil(sampleRate / 1050);
-    const tauMax = Math.min(W - 1, Math.floor(sampleRate / 75));
-
-    // Recull tots els mínims locals per sota THRESH
-    const cands = [];
-    let tau = Math.max(2, tauMin);
-    while (tau < tauMax) {
-      if (cmndf[tau] < THRESH) {
-        while (tau + 1 < tauMax && cmndf[tau + 1] < cmndf[tau]) tau++;
-        cands.push(tau);
-        while (tau + 1 < tauMax && cmndf[tau] < THRESH) tau++;
-      }
-      tau++;
-    }
-    if (cands.length === 0) return [0, 0];
-
-    // Tria el darrer candidat "prou bo" (fins 1.8× la millor confiança)
-    const bestV = Math.min(...cands.map(c => cmndf[c]));
-    const good  = cands.filter(c => cmndf[c] < bestV * 1.8);
-    const bt    = good[good.length - 1];
-
-    let t = bt;
-    if (bt > 1 && bt < W - 1) {
-      const x0 = cmndf[bt-1], x1 = cmndf[bt], x2 = cmndf[bt+1];
-      const den = x0 - 2*x1 + x2;
-      if (Math.abs(den) > 1e-9) t = bt + 0.5*(x0-x2)/den;
-    }
-    return [sampleRate / t, 1 - cmndf[bt]];
-  }
-
-  function freqToNoteCa(freq) {
-    if (freq < 75 || freq > 1100) return null; // fora del rang vocal
-    const midi = 12 * Math.log2(freq / 440) + 69;
-    const semi = ((Math.round(midi) % 12) + 12) % 12;
-    let bestSemi = 0, bestDist = 100;
-    for (const n of NATURAL_SEMITONES) {
-      let d = Math.abs(n - semi);
-      if (d > 6) d = 12 - d;
-      if (d < bestDist) { bestDist = d; bestSemi = n; }
-    }
-    if (bestDist > 1.5) return null;
-    return NOTE_CLASS_BY_SEMITONE[bestSemi] || null;
-  }
-
-  // ── Web Speech API ─────────────────────────────────────────────────────────
-  // Reconeix el nom de la nota dit o cantat en veu alta. Funciona en Chrome,
-  // Edge i Safari sense cap instal·lació extra.
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
   let speechRec  = null;
   let speechLive = false;
 
   function matchNoteCA(text) {
-    // Normalitza a ASCII, afegeix espais com a delimitadors de paraula
     const t = " " + text.toLowerCase().replace(/[^a-z]/g, " ") + " ";
     if (t.includes(" sol ")) return "sol";
     if (t.includes(" si "))  return "si";
@@ -1218,35 +1119,16 @@
     return null;
   }
 
-  function initSpeech() {
-    if (!SpeechRec) return;
-    speechRec = new SpeechRec();
-    // es-ES: Chrome té model espanyol robust que reconeix solfège (do/re/mi...)
-    // millor que ca-ES que pot no estar disponible offline.
-    speechRec.lang = "es-ES";
-    speechRec.continuous = true;
-    speechRec.interimResults = true;
-    speechRec.maxAlternatives = 3;
-    speechRec.onresult = (e) => {
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        for (let j = 0; j < e.results[i].length; j++) {
-          const note = matchNoteCA(e.results[i][j].transcript);
-          if (note) { triggerMicNote(note, "veu"); return; }
-        }
-      }
-    };
-    speechRec.onerror = (e) => { if (e.error !== "no-speech") console.warn("[SPEECH]", e.error); };
-    speechRec.onend   = () => { if (speechLive) { try { speechRec.start(); } catch(_) {} } };
-  }
-
-  // ── Trigger ────────────────────────────────────────────────────────────────
-  function triggerMicNote(noteCa, mode) {
+  function triggerMicNote(noteCa) {
     const now = performance.now();
-    if (now - micLastMatchAt < 900) return; // cooldown
+    if (now - micLastMatchAt < 800) return;
     micLastMatchAt = now;
-    micStatus.textContent = "✓ " + noteCa.toUpperCase() + " [" + mode + "]";
+    micStatus.textContent = "✓ " + noteCa.toUpperCase();
     micStatus.classList.add("detected");
-    setTimeout(() => { if (!micActive) return; micStatus.textContent = "🎤"; micStatus.classList.remove("detected"); }, 900);
+    setTimeout(() => {
+      if (micActive) { micStatus.textContent = "🎤 diga la nota..."; }
+      micStatus.classList.remove("detected");
+    }, 800);
     let btn = null;
     if (currentStep < sequence.length) {
       const cur = sequence[currentStep];
@@ -1258,115 +1140,69 @@
     if (btn) btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
   }
 
-  // ── Bucle de pitch — FINESTRA LLISCANT ─────────────────────────────────────
-  // Problema anterior: reset de l'historial en cada frame null → mai dispara.
-  // Solució: finestra de 10 lectures, disparar si 3+ coincideixen (tolera misses).
-  let pitchWindow   = [];   // últimes N lectures (pot contenir null = miss)
-  let pitchFrameCtr = 0;
-  const PW_SIZE     = 10;   // mida de la finestra lliscant
-  const PW_MIN      = 3;    // mínim de lectures coincidents per disparar
-  const PW_CONF     = 0.40; // confiança mínima del pitch
-  const PW_RMS_MIN  = 0.005;
-
-  function micLoop() {
-    if (!micActive || !micAnalyser) return;
-    micRAF = requestAnimationFrame(micLoop);
-
-    micAnalyser.getFloatTimeDomainData(micBuffer);
-    let sumSq = 0;
-    for (let i = 0; i < micBuffer.length; i++) sumSq += micBuffer[i] * micBuffer[i];
-    const rms = Math.sqrt(sumSq / micBuffer.length);
-
-    // Silenci real → reset complet
-    if (rms < PW_RMS_MIN) {
-      if (micStatus.textContent !== "🎤") { micStatus.textContent = "🎤"; micStatus.classList.remove("detected"); }
-      pitchWindow = [];
-      return;
-    }
-
-    pitchFrameCtr++;
-    if (pitchFrameCtr % 2 !== 0) return; // ~30 lectures/s
-
-    const [freq, conf] = pitchyDet
-      ? pitchyDet.findPitch(micBuffer, micCtx.sampleRate)
-      : yinPitch(micBuffer, micCtx.sampleRate);
-    const algo = pitchyDet ? "mpm" : "yin";
-
-    const noteCa = (freq > 75 && freq < 1100 && conf > PW_CONF)
-      ? freqToNoteCa(freq) : null;
-
-    // Afegim a la finestra (null = lectura no fiable, no reseteja)
-    pitchWindow.push(noteCa);
-    if (pitchWindow.length > PW_SIZE) pitchWindow.shift();
-
-    if (noteCa) {
-      micStatus.textContent = noteCa.toUpperCase() + " " + Math.round(freq) + "Hz c:" + conf.toFixed(2) + " [" + algo + "]";
-      micStatus.classList.add("detected");
-      // Compta coincidències en la finestra
-      const count = pitchWindow.filter(n => n === noteCa).length;
-      if (count >= PW_MIN) {
-        pitchWindow = [];
-        triggerMicNote(noteCa, algo);
+  function initSpeech() {
+    if (!SpeechRec) return;
+    speechRec = new SpeechRec();
+    speechRec.lang = "es-ES";
+    speechRec.continuous = true;
+    speechRec.interimResults = true;
+    speechRec.maxAlternatives = 5;
+    speechRec.onresult = (e) => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        // Mostra en temps real el que sent (interim) — debug visual
+        if (!e.results[i].isFinal && e.results[i][0]) {
+          const interim = e.results[i][0].transcript.toLowerCase().trim();
+          if (interim) micStatus.textContent = "🎤 " + interim;
+        }
+        for (let j = 0; j < e.results[i].length; j++) {
+          const note = matchNoteCA(e.results[i][j].transcript);
+          if (note) { triggerMicNote(note); return; }
+        }
       }
-    } else {
-      micStatus.textContent = "♩ " + (freq > 10 ? Math.round(freq) + "Hz" : "rms:" + rms.toFixed(3));
-      micStatus.classList.remove("detected");
-    }
+    };
+    speechRec.onerror = (e) => {
+      if (e.error === "no-speech") return;
+      if (e.error === "network") {
+        micStatus.textContent = "⚠️ Cal connexió internet";
+      } else if (e.error === "not-allowed") {
+        micStatus.textContent = "⚠️ Permís micròfon denegat";
+        stopMic();
+      } else {
+        micStatus.textContent = "⚠️ " + e.error;
+        console.warn("[SPEECH]", e.error);
+      }
+    };
+    speechRec.onend = () => {
+      if (speechLive) setTimeout(() => { try { speechRec.start(); } catch(_) {} }, 150);
+    };
   }
 
-  // ── Start / Stop ────────────────────────────────────────────────────────────
-  async function startMic() {
-    // 1. Demana accés al micròfon
-    try {
-      micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true }
-      });
-    } catch (e) {
-      alert("No s'ha pogut accedir al micròfon. Dona permís al navegador.");
+  function startMic() {
+    if (!SpeechRec) {
+      micStatus.textContent = "⚠️ Usa Chrome o Edge";
       return;
     }
-    // 2. AudioContext per a pitch (pitchy / YIN)
-    try {
-      if (!micCtx) { const AC = window.AudioContext || window.webkitAudioContext; micCtx = new AC(); }
-      if (micCtx.state === "suspended") await micCtx.resume();
-      const source = micCtx.createMediaStreamSource(micStream);
-      micAnalyser  = micCtx.createAnalyser();
-      micAnalyser.fftSize = 2048;
-      micAnalyser.smoothingTimeConstant = 0;
-      source.connect(micAnalyser);
-      micBuffer = new Float32Array(micAnalyser.fftSize);
-    } catch (e) {
-      alert("Error inicialitzant el micròfon: " + e.message);
-      stopMic(); return;
-    }
+    if (!speechRec) initSpeech();
     micActive = true;
-    pitchWindow = [];
+    speechLive = true;
     micLastMatchAt = 0;
-    pitchFrameCtr = 0;
     micBtn.classList.add("active");
-    micBtn.textContent = "🔴 Escoltant...";
-    micStatus.textContent = "🎤";
-    loadPitchy(micAnalyser.fftSize); // async des de CDN
-    micLoop();
-    // 3. Speech API per al nom dit (arrenca 300ms després per evitar conflicte)
-    setTimeout(() => {
-      if (!micActive) return;
-      if (!speechRec) initSpeech();
-      if (speechRec) { speechLive = true; try { speechRec.start(); } catch(_) {} }
-    }, 300);
+    micBtn.textContent = "🔴 Veu activa";
+    micStatus.textContent = "🎤 diga la nota...";
+    try { speechRec.start(); } catch(e) {
+      micStatus.textContent = "⚠️ " + e.message;
+      stopMic();
+    }
   }
 
   function stopMic() {
     micActive  = false;
     speechLive = false;
-    if (micRAF)    { cancelAnimationFrame(micRAF); micRAF = null; }
     if (speechRec) { try { speechRec.stop(); } catch(_) {} }
-    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
     micBtn.classList.remove("active");
     micBtn.textContent = "🎤 Veu";
     micStatus.textContent = "";
     micStatus.classList.remove("detected");
-    pitchWindow = [];
   }
 
   micBtn.addEventListener("click", () => {
@@ -1374,7 +1210,6 @@
     else startMic();
   });
 
-  // Parem el mic si l'usuari canvia de pestanya
   document.addEventListener("visibilitychange", () => {
     if (document.hidden && micActive) stopMic();
   });
