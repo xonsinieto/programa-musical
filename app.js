@@ -1111,10 +1111,12 @@
     const t = " " + text.toLowerCase().replace(/[^a-z]/g, " ") + " ";
     if (t.includes(" sol ")) return "sol";
     if (t.includes(" si "))  return "si";
-    if (t.includes(" do "))  return "do";
+    // "do" sovint transcrit com "dos"/"don"/"doh" per la Speech API en espanyol
+    if (/ do[snhx]? /.test(t)) return "do";
     if (t.includes(" re "))  return "re";
     if (t.includes(" mi "))  return "mi";
-    if (t.includes(" fa "))  return "fa";
+    // "fa" a vegades transcrit com "ja"/"ha" — afegim alternatives catalanes
+    if (t.includes(" fa ") || t.includes(" ja ")) return "fa";
     if (t.includes(" la "))  return "la";
     return null;
   }
@@ -1143,10 +1145,10 @@
   function initSpeech() {
     if (!SpeechRec) return;
     speechRec = new SpeechRec();
-    speechRec.lang = "es-ES";
+    speechRec.lang = "ca-ES";    // Català: "fa", "sol", "la", "si" són paraules molt comunes
     speechRec.continuous = true;
     speechRec.interimResults = true;
-    speechRec.maxAlternatives = 5;
+    speechRec.maxAlternatives = 3;
     speechRec.onresult = (e) => {
       for (let i = e.resultIndex; i < e.results.length; i++) {
         if (!e.results[i].isFinal) {
@@ -1175,7 +1177,7 @@
       }
     };
     speechRec.onend = () => {
-      if (speechLive) setTimeout(() => { try { speechRec.start(); } catch(_) {} }, 150);
+      if (speechLive) try { speechRec.start(); } catch(_) {}
     };
   }
 
