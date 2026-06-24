@@ -1113,10 +1113,30 @@
   // Algorisme professional (Audacity, Melodyne). Molt millor que autocorrelació
   // per veu humana: detecta el to fonamental fins i tot amb harmònics complexos.
   // Retorna [freq_Hz, confiança_0_1]. Confiança >0.5 ja és fiable per veu.
+  // ── pitchy (MPM) — biblioteca externa, es carrega async al primer ús ────────
+  // https://github.com/ianprime0509/pitchy (Jake Archibald / Ian Prime)
+  let pitchyDet = null; // PitchDetector instància, o null fins que carregui
+
+  async function loadPitchy(bufSize) {
+    if (pitchyDet) return;
+    try {
+      const { PitchDetector } = await import("https://cdn.jsdelivr.net/npm/pitchy@4.1.0/+esm");
+      pitchyDet = PitchDetector.forFloat32Array(bufSize);
+      pitchyDet.minVolumeDecibels = -40;
+      console.log("[PITCH] pitchy MPM carregat OK");
+    } catch(e) {
+      console.warn("[PITCH] pitchy no disponible, usant YIN propi:", e.message);
+    }
+  }
+
+  // ── YIN (fallback quan pitchy no estigui disponible) ───────────────────────
+  // Versió corregida: recull TOTS els mínims locals i tria el DARRER
+  // (tau més gran = freqüència més baixa = to fonamental).
+  // Els harmònics creen mínims a tau/2, tau/3 → tau MENOR → descartats.
   function yinPitch(buffer, sampleRate) {
     const N = buffer.length;
     const W = Math.floor(N / 2);
-    const THRESH = 0.15; // lleugerament més permissiu per veu
+    const THRESH = 0.15;
 
     const diff = new Float32Array(W);
     for (let tau = 1; tau < W; tau++) {
@@ -1133,43 +1153,39 @@
       cmndf[tau] = run > 0 ? diff[tau] * tau / run : 1;
     }
 
-    // Rang de veu: 65 Hz (C2) a 700 Hz (F5) — evita detectar harmònics alts
-    const tauMin = Math.ceil(sampleRate / 700);
-    const tauMax = Math.min(W - 1, Math.floor(sampleRate / 65));
+    // Rang vocal: 75 Hz–1050 Hz cobreix tots els cantants (baix fins a soprano)
+    const tauMin = Math.ceil(sampleRate / 1050);
+    const tauMax = Math.min(W - 1, Math.floor(sampleRate / 75));
+
+    // Recull tots els mínims locals per sota THRESH
+    const cands = [];
     let tau = Math.max(2, tauMin);
     while (tau < tauMax) {
       if (cmndf[tau] < THRESH) {
         while (tau + 1 < tauMax && cmndf[tau + 1] < cmndf[tau]) tau++;
-        break;
+        cands.push(tau);
+        while (tau + 1 < tauMax && cmndf[tau] < THRESH) tau++;
       }
       tau++;
     }
-    if (tau >= tauMax) return [0, 0];
+    if (cands.length === 0) return [0, 0];
 
-    // Comprovació sub-harmònica: si 2×tau o 3×tau també té un mínim
-    // vàlid, preferim-lo (freq menor = fonamental, no harmònic).
-    // Exemple: Do (261Hz) detectat com Sol (784Hz = 3×Do) → tau×3 = Do ✓
-    for (const mult of [2, 3]) {
-      const t2 = Math.round(tau * mult);
-      if (t2 >= tauMax) break;
-      let ts = Math.max(t2 - 3, tau + 1);
-      const te = Math.min(t2 + 4, tauMax);
-      while (ts + 1 < te && cmndf[ts + 1] < cmndf[ts]) ts++;
-      if (cmndf[ts] < THRESH * 1.6) { tau = ts; break; } // prefer lower freq
-    }
+    // Tria el darrer candidat "prou bo" (fins 1.8× la millor confiança)
+    const bestV = Math.min(...cands.map(c => cmndf[c]));
+    const good  = cands.filter(c => cmndf[c] < bestV * 1.8);
+    const bt    = good[good.length - 1];
 
-    let t = tau;
-    if (tau > 1 && tau < W - 1) {
-      const x0 = cmndf[tau-1], x1 = cmndf[tau], x2 = cmndf[tau+1];
+    let t = bt;
+    if (bt > 1 && bt < W - 1) {
+      const x0 = cmndf[bt-1], x1 = cmndf[bt], x2 = cmndf[bt+1];
       const den = x0 - 2*x1 + x2;
-      if (Math.abs(den) > 1e-9) t = tau + 0.5*(x0-x2)/den;
+      if (Math.abs(den) > 1e-9) t = bt + 0.5*(x0-x2)/den;
     }
-    return [sampleRate / t, 1 - cmndf[tau]];
+    return [sampleRate / t, 1 - cmndf[bt]];
   }
 
   function freqToNoteCa(freq) {
-    // Fora del rang vocal raonable, rebutgem
-    if (freq < 65 || freq > 700) return null;
+    if (freq < 75 || freq > 1100) return null; // fora del rang vocal
     const midi = 12 * Math.log2(freq / 440) + 69;
     const semi = ((Math.round(midi) % 12) + 12) % 12;
     let bestSemi = 0, bestDist = 100;
@@ -1178,7 +1194,7 @@
       if (d > 6) d = 12 - d;
       if (d < bestDist) { bestDist = d; bestSemi = n; }
     }
-    if (bestDist > 1.5) return null; // fins a 1.5 semitò (veu no professional)
+    if (bestDist > 1.5) return null;
     return NOTE_CLASS_BY_SEMITONE[bestSemi] || null;
   }
 
@@ -1241,58 +1257,63 @@
     if (btn) btn.click();
   }
 
-  // ── Bucle YIN ──────────────────────────────────────────────────────────────
-  let yinHistory = [];
-  let yinFrameCounter = 0;
-  const YIN_FRAMES  = 4;
-  const YIN_AGREE   = 3;
-  const YIN_CONF    = 0.40;
-  const YIN_RMS_MIN = 0.006;
+  // ── Bucle de pitch ──────────────────────────────────────────────────────────
+  let pitchHistory = [];
+  let pitchFrameCounter = 0;
+  const PITCH_FRAMES  = 4;  // frames consecutius necessaris
+  const PITCH_AGREE   = 3;  // quants han de coincidir
+  const PITCH_CONF    = 0.50;
+  const PITCH_RMS_MIN = 0.006;
 
   function micLoop() {
     if (!micActive || !micAnalyser) return;
     micRAF = requestAnimationFrame(micLoop);
 
-    // Llegim sempre el RMS (barat), però YIN (car) cada 2 frames (~30fps)
     micAnalyser.getFloatTimeDomainData(micBuffer);
     let sumSq = 0;
     for (let i = 0; i < micBuffer.length; i++) sumSq += micBuffer[i] * micBuffer[i];
     const rms = Math.sqrt(sumSq / micBuffer.length);
 
-    if (rms < YIN_RMS_MIN) {
-      micStatus.textContent = "🔇 " + rms.toFixed(3);
+    if (rms < PITCH_RMS_MIN) {
+      micStatus.textContent = "🔇";
       micStatus.classList.remove("detected");
-      yinHistory = [];
+      pitchHistory = [];
       return;
     }
 
-    yinFrameCounter++;
-    if (yinFrameCounter % 2 !== 0) return; // throttle: YIN cada 2 frames
+    pitchFrameCounter++;
+    if (pitchFrameCounter % 2 !== 0) return; // pitch cada 2 frames → ~30Hz
 
-    const [freq, conf] = yinPitch(micBuffer, micCtx.sampleRate);
-    if (freq > 48 && freq < 1400 && conf > YIN_CONF) {
+    // Pitchy (MPM) si disponible, YIN com a fallback
+    const [freq, conf] = pitchyDet
+      ? pitchyDet.findPitch(micBuffer, micCtx.sampleRate)
+      : yinPitch(micBuffer, micCtx.sampleRate);
+
+    const algo = pitchyDet ? "mpm" : "yin";
+
+    if (freq > 75 && freq < 1100 && conf > PITCH_CONF) {
       const noteCa = freqToNoteCa(freq);
       if (noteCa) {
-        micStatus.textContent = noteCa.toUpperCase() + " " + Math.round(freq) + "Hz  c:" + conf.toFixed(2);
+        micStatus.textContent = noteCa.toUpperCase() + " " + Math.round(freq) + "Hz  c:" + conf.toFixed(2) + " [" + algo + "]";
         micStatus.classList.add("detected");
-        yinHistory.push(noteCa);
-        if (yinHistory.length > YIN_FRAMES) yinHistory.shift();
-        if (yinHistory.length >= YIN_FRAMES) {
+        pitchHistory.push(noteCa);
+        if (pitchHistory.length > PITCH_FRAMES) pitchHistory.shift();
+        if (pitchHistory.length >= PITCH_FRAMES) {
           const counts = {};
-          yinHistory.forEach(n => counts[n] = (counts[n]||0) + 1);
+          pitchHistory.forEach(n => counts[n] = (counts[n]||0) + 1);
           let best = null, bestC = 0;
           for (const n in counts) { if (counts[n] > bestC) { bestC = counts[n]; best = n; } }
-          if (bestC >= YIN_AGREE) { yinHistory = []; triggerMicNote(best, "pitch"); }
+          if (bestC >= PITCH_AGREE) { pitchHistory = []; triggerMicNote(best, algo); }
         }
       } else {
-        micStatus.textContent = Math.round(freq) + "Hz  c:" + conf.toFixed(2);
+        micStatus.textContent = Math.round(freq) + "Hz ?  c:" + conf.toFixed(2);
         micStatus.classList.remove("detected");
-        yinHistory = [];
+        pitchHistory = [];
       }
     } else {
-      micStatus.textContent = "rms:" + rms.toFixed(3) + (conf > 0 ? "  c:" + conf.toFixed(2) : "");
+      micStatus.textContent = "rms:" + rms.toFixed(3);
       micStatus.classList.remove("detected");
-      yinHistory = [];
+      pitchHistory = [];
     }
   }
 
@@ -1320,8 +1341,9 @@
       stopMic(); return;
     }
     micActive = true;
-    yinHistory = [];
+    pitchHistory = [];
     micLastMatchAt = 0;
+    loadPitchy(micAnalyser.fftSize); // càrrega async de pitchy des de CDN
     micBtn.classList.add("active");
     micBtn.textContent = "🔴 Escoltant...";
     micLoop();
