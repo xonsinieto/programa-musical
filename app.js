@@ -1239,31 +1239,34 @@
     speechRec.onend   = () => { if (speechLive) { try { speechRec.start(); } catch(_) {} } };
   }
 
-  // ── Trigger unificat ────────────────────────────────────────────────────────
+  // ── Trigger ────────────────────────────────────────────────────────────────
   function triggerMicNote(noteCa, mode) {
     const now = performance.now();
-    if (now - micLastMatchAt < 700) return;
+    if (now - micLastMatchAt < 900) return; // cooldown
     micLastMatchAt = now;
     micStatus.textContent = "✓ " + noteCa.toUpperCase() + " [" + mode + "]";
     micStatus.classList.add("detected");
-    setTimeout(() => micStatus.classList.remove("detected"), 700);
+    setTimeout(() => { if (!micActive) return; micStatus.textContent = "🎤"; micStatus.classList.remove("detected"); }, 900);
     let btn = null;
     if (currentStep < sequence.length) {
       const cur = sequence[currentStep];
       if (NOTE_NAMES_CA[noteLetter(cur.note)] === noteCa)
-        btn = trainPiano.querySelector('[data-pitch="' + cur.note + '"]');
+        btn = trainPiano ? trainPiano.querySelector('[data-pitch="' + cur.note + '"]') : null;
     }
-    if (!btn) btn = trainPiano.querySelector('.nk-key:not(.nk-inactive)[data-note="' + noteCa + '"]');
-    if (btn) btn.click();
+    if (!btn && trainPiano)
+      btn = trainPiano.querySelector('.nk-key:not(.nk-inactive)[data-note="' + noteCa + '"]');
+    if (btn) btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
   }
 
-  // ── Bucle de pitch ──────────────────────────────────────────────────────────
-  let pitchHistory = [];
-  let pitchFrameCounter = 0;
-  const PITCH_FRAMES  = 4;  // frames consecutius necessaris
-  const PITCH_AGREE   = 3;  // quants han de coincidir
-  const PITCH_CONF    = 0.50;
-  const PITCH_RMS_MIN = 0.006;
+  // ── Bucle de pitch — FINESTRA LLISCANT ─────────────────────────────────────
+  // Problema anterior: reset de l'historial en cada frame null → mai dispara.
+  // Solució: finestra de 10 lectures, disparar si 3+ coincideixen (tolera misses).
+  let pitchWindow   = [];   // últimes N lectures (pot contenir null = miss)
+  let pitchFrameCtr = 0;
+  const PW_SIZE     = 10;   // mida de la finestra lliscant
+  const PW_MIN      = 3;    // mínim de lectures coincidents per disparar
+  const PW_CONF     = 0.40; // confiança mínima del pitch
+  const PW_RMS_MIN  = 0.005;
 
   function micLoop() {
     if (!micActive || !micAnalyser) return;
@@ -1274,65 +1277,61 @@
     for (let i = 0; i < micBuffer.length; i++) sumSq += micBuffer[i] * micBuffer[i];
     const rms = Math.sqrt(sumSq / micBuffer.length);
 
-    if (rms < PITCH_RMS_MIN) {
-      micStatus.textContent = "🔇";
-      micStatus.classList.remove("detected");
-      pitchHistory = [];
+    // Silenci real → reset complet
+    if (rms < PW_RMS_MIN) {
+      if (micStatus.textContent !== "🎤") { micStatus.textContent = "🎤"; micStatus.classList.remove("detected"); }
+      pitchWindow = [];
       return;
     }
 
-    pitchFrameCounter++;
-    if (pitchFrameCounter % 2 !== 0) return; // pitch cada 2 frames → ~30Hz
+    pitchFrameCtr++;
+    if (pitchFrameCtr % 2 !== 0) return; // ~30 lectures/s
 
-    // Pitchy (MPM) si disponible, YIN com a fallback
     const [freq, conf] = pitchyDet
       ? pitchyDet.findPitch(micBuffer, micCtx.sampleRate)
       : yinPitch(micBuffer, micCtx.sampleRate);
-
     const algo = pitchyDet ? "mpm" : "yin";
 
-    if (freq > 75 && freq < 1100 && conf > PITCH_CONF) {
-      const noteCa = freqToNoteCa(freq);
-      if (noteCa) {
-        micStatus.textContent = noteCa.toUpperCase() + " " + Math.round(freq) + "Hz  c:" + conf.toFixed(2) + " [" + algo + "]";
-        micStatus.classList.add("detected");
-        pitchHistory.push(noteCa);
-        if (pitchHistory.length > PITCH_FRAMES) pitchHistory.shift();
-        if (pitchHistory.length >= PITCH_FRAMES) {
-          const counts = {};
-          pitchHistory.forEach(n => counts[n] = (counts[n]||0) + 1);
-          let best = null, bestC = 0;
-          for (const n in counts) { if (counts[n] > bestC) { bestC = counts[n]; best = n; } }
-          if (bestC >= PITCH_AGREE) { pitchHistory = []; triggerMicNote(best, algo); }
-        }
-      } else {
-        micStatus.textContent = Math.round(freq) + "Hz ?  c:" + conf.toFixed(2);
-        micStatus.classList.remove("detected");
-        pitchHistory = [];
+    const noteCa = (freq > 75 && freq < 1100 && conf > PW_CONF)
+      ? freqToNoteCa(freq) : null;
+
+    // Afegim a la finestra (null = lectura no fiable, no reseteja)
+    pitchWindow.push(noteCa);
+    if (pitchWindow.length > PW_SIZE) pitchWindow.shift();
+
+    if (noteCa) {
+      micStatus.textContent = noteCa.toUpperCase() + " " + Math.round(freq) + "Hz c:" + conf.toFixed(2) + " [" + algo + "]";
+      micStatus.classList.add("detected");
+      // Compta coincidències en la finestra
+      const count = pitchWindow.filter(n => n === noteCa).length;
+      if (count >= PW_MIN) {
+        pitchWindow = [];
+        triggerMicNote(noteCa, algo);
       }
     } else {
-      micStatus.textContent = "rms:" + rms.toFixed(3);
+      micStatus.textContent = "♩ " + (freq > 10 ? Math.round(freq) + "Hz" : "rms:" + rms.toFixed(3));
       micStatus.classList.remove("detected");
-      pitchHistory = [];
     }
   }
 
   // ── Start / Stop ────────────────────────────────────────────────────────────
   async function startMic() {
+    // 1. Demana accés al micròfon
     try {
       micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true }
       });
     } catch (e) {
       alert("No s'ha pogut accedir al micròfon. Dona permís al navegador.");
       return;
     }
+    // 2. AudioContext per a pitch (pitchy / YIN)
     try {
       if (!micCtx) { const AC = window.AudioContext || window.webkitAudioContext; micCtx = new AC(); }
       if (micCtx.state === "suspended") await micCtx.resume();
       const source = micCtx.createMediaStreamSource(micStream);
       micAnalyser  = micCtx.createAnalyser();
-      micAnalyser.fftSize = 2048; // YIN amb 2048 (W=1024) = 1M ops/frame, manejable
+      micAnalyser.fftSize = 2048;
       micAnalyser.smoothingTimeConstant = 0;
       source.connect(micAnalyser);
       micBuffer = new Float32Array(micAnalyser.fftSize);
@@ -1341,15 +1340,20 @@
       stopMic(); return;
     }
     micActive = true;
-    pitchHistory = [];
+    pitchWindow = [];
     micLastMatchAt = 0;
-    loadPitchy(micAnalyser.fftSize); // càrrega async de pitchy des de CDN
+    pitchFrameCtr = 0;
     micBtn.classList.add("active");
     micBtn.textContent = "🔴 Escoltant...";
+    micStatus.textContent = "🎤";
+    loadPitchy(micAnalyser.fftSize); // async des de CDN
     micLoop();
-    // Arrenca Speech API en paral·lel
-    if (!speechRec) initSpeech();
-    if (speechRec) { speechLive = true; try { speechRec.start(); } catch(_) {} }
+    // 3. Speech API per al nom dit (arrenca 300ms després per evitar conflicte)
+    setTimeout(() => {
+      if (!micActive) return;
+      if (!speechRec) initSpeech();
+      if (speechRec) { speechLive = true; try { speechRec.start(); } catch(_) {} }
+    }, 300);
   }
 
   function stopMic() {
@@ -1362,6 +1366,7 @@
     micBtn.textContent = "🎤 Veu";
     micStatus.textContent = "";
     micStatus.classList.remove("detected");
+    pitchWindow = [];
   }
 
   micBtn.addEventListener("click", () => {
