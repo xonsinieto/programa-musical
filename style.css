@@ -1609,6 +1609,193 @@ nav.tabs .tab:active {
   50%      { box-shadow: 0 0 0 8px rgba(231,76,60,0); }
 }
 
+/* ── Botó recalibrar ── */
+.mic-recal-btn {
+  background: none;
+  border: 1px solid rgba(0,240,255,0.3);
+  color: rgba(0,240,255,0.7);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.mic-recal-btn:hover { background: rgba(0,240,255,0.1); color: var(--primary); }
+
+/* ══════════════════════════════════════════════════════════
+   MODAL CALIBRACIÓ DE VEU
+   ══════════════════════════════════════════════════════════ */
+#voice-cal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(5,7,15,0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+#voice-cal-overlay[hidden] { display: none; }
+
+.vcal-box {
+  background: linear-gradient(160deg, rgba(18,22,45,0.98), rgba(5,7,15,0.98));
+  border: 1.5px solid rgba(0,240,255,0.25);
+  border-radius: 20px;
+  padding: 28px 24px 20px;
+  max-width: 380px;
+  width: 100%;
+  box-shadow: 0 0 60px rgba(0,240,255,0.08), 0 20px 60px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+}
+
+.vcal-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.vcal-title {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.vcal-step-counter {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: rgba(232,236,241,0.45);
+}
+
+.vcal-note-big {
+  font-family: 'Unbounded', sans-serif;
+  font-size: clamp(3.5rem, 15vw, 5rem);
+  font-weight: 900;
+  background: linear-gradient(135deg, #00F0FF, #FF10F0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  line-height: 1;
+  min-height: 1.1em;
+}
+
+.vcal-instruction {
+  font-size: 0.92rem;
+  color: rgba(232,236,241,0.75);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.vcal-dots {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  min-height: 20px;
+}
+.vcal-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(0,240,255,0.4);
+  background: transparent;
+  transition: all 0.3s;
+}
+.vcal-dot.filled {
+  background: var(--primary);
+  border-color: var(--primary);
+  box-shadow: 0 0 10px rgba(0,240,255,0.6);
+}
+
+.vcal-btn-record {
+  background: linear-gradient(135deg, var(--primary), #0099aa);
+  color: #05070F;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 32px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.03em;
+  min-width: 180px;
+}
+.vcal-btn-record:hover:not(:disabled) { transform: scale(1.04); box-shadow: 0 0 20px rgba(0,240,255,0.4); }
+.vcal-btn-record:disabled { opacity: 0.45; cursor: default; transform: none; }
+.vcal-btn-record.recording {
+  background: linear-gradient(135deg, #FF10F0, #cc00cc);
+  animation: vcalRecPulse 0.6s infinite ease-in-out;
+}
+@keyframes vcalRecPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(255,16,240,0.5); }
+  50%     { box-shadow: 0 0 0 10px rgba(255,16,240,0); }
+}
+
+.vcal-btn-skip {
+  background: none;
+  border: none;
+  color: rgba(232,236,241,0.4);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+.vcal-btn-skip:hover { color: rgba(232,236,241,0.7); }
+
+.vcal-btn-cancel {
+  background: none;
+  border: 1px solid rgba(231,76,60,0.35);
+  color: rgba(231,76,60,0.7);
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 4px;
+}
+.vcal-btn-cancel:hover { background: rgba(231,76,60,0.1); color: #e74c3c; }
+
+/* Training area */
+.vcal-brain { font-size: 3rem; animation: vcalBrain 1.5s ease-in-out infinite; }
+@keyframes vcalBrain {
+  0%,100% { transform: scale(1); filter: brightness(1); }
+  50%     { transform: scale(1.12); filter: brightness(1.3) drop-shadow(0 0 12px rgba(0,240,255,0.6)); }
+}
+.vcal-train-text {
+  font-size: 0.95rem;
+  color: var(--ink);
+  margin: 0;
+  font-weight: 600;
+  min-height: 1.4em;
+}
+.vcal-train-bar-wrap {
+  width: 100%;
+  height: 8px;
+  background: rgba(0,240,255,0.12);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.vcal-train-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--primary), #FF10F0);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px rgba(0,240,255,0.4);
+}
+.vcal-train-hint {
+  font-size: 0.75rem;
+  color: rgba(232,236,241,0.35);
+  margin: -8px 0 0;
+}
+
 #new-note-btn:active {
   background: var(--primary-dark);
   transform: translateY(0);

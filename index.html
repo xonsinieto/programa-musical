@@ -204,6 +204,7 @@
         <button id="new-note-btn">Nova</button>
         <button id="mic-btn" type="button">🎤 Veu</button>
         <span id="mic-status" class="mic-status"></span>
+        <button id="mic-recal-btn" type="button" class="mic-recal-btn" hidden title="Recalibrar veu">⚙</button>
       </div>
 
       <div id="staff-container"></div>
@@ -696,5 +697,32 @@
       });
     }
   </script>
+
+  <!-- ── MODAL CALIBRACIÓ DE VEU ── -->
+  <div id="voice-cal-overlay" role="dialog" aria-modal="true" aria-label="Calibra la teva veu" hidden>
+    <div class="vcal-box">
+      <div class="vcal-header">
+        <span class="vcal-title">Calibra la teva veu</span>
+        <span id="vcal-step-counter" class="vcal-step-counter">Pas 1 / 8</span>
+      </div>
+
+      <div id="vcal-record-area">
+        <div id="vcal-note-big" class="vcal-note-big">DO</div>
+        <p id="vcal-instruction" class="vcal-instruction">Di "DO" clarament 4 vegades</p>
+        <div id="vcal-dots" class="vcal-dots"></div>
+        <button id="vcal-record-btn" class="vcal-btn-record">🎙️ Grava</button>
+        <button id="vcal-skip-btn" class="vcal-btn-skip">Salta →</button>
+      </div>
+
+      <div id="vcal-training-area" hidden>
+        <div class="vcal-brain">🧠</div>
+        <p id="vcal-train-text" class="vcal-train-text">Preparant l'entrenament...</p>
+        <div class="vcal-train-bar-wrap"><div id="vcal-train-bar" class="vcal-train-bar"></div></div>
+        <p class="vcal-train-hint">Pot trigar uns 30 segons</p>
+      </div>
+
+      <button id="vcal-cancel-btn" class="vcal-btn-cancel">✕ Cancel·la</button>
+    </div>
+  </div>
 </body>
 </html>
