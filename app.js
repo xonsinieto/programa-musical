@@ -1093,7 +1093,10 @@
   });
   songSelect.addEventListener("change", startRound);
 
-  // ---------- DETECCIÓ DE VEU (TF.js transfer learning + Speech API fallback) ----------
+  // ── DETECCIÓ DE VEU — Model lleuger personalitzat ──────────────────
+  // Cap descàrrega de model extern (18 MB). Usa Web Audio API + TF.js core
+  // (~300 KB) per entrenar un classificador de 8 classes amb la veu pròpia.
+  // Entrenament: <5 seg. Model guardat a localStorage per perfil.
   const micBtn      = document.getElementById("mic-btn");
   const micStatus   = document.getElementById("mic-status");
   const micRecalBtn = document.getElementById("mic-recal-btn");
@@ -1101,98 +1104,315 @@
 
   let micActive = false, micLastMatchAt = 0;
 
-  // TF.js state (carregat lazy quan l'usuari prem el mic)
-  let tfBase = null, tfXfer = null, tfListening = false;
-  const TF_NOTES  = ['do','re','mi','fa','sol','la','si'];
-  const TF_LABELS = [...TF_NOTES, '_background_noise_'];
-  const TF_THRESH = 0.80;
+  // Constants
+  const VN_NOTES    = ['do','re','mi','fa','sol','la','si'];
+  const VN_LABELS   = ['do','re','mi','fa','sol','la','si','_noise_'];
+  const VN_NAMES    = { do:'DO', re:'RE', mi:'MI', fa:'FA', sol:'SOL', la:'LA', si:'SI', '_noise_':'🔇 Silenci' };
+  const VN_EXAMPLES = 4;
+  const VN_THRESH   = 0.82;
+  const VN_FFT      = 256;
+  const VN_BINS     = 128;
 
-  function voiceModelKey() { return 'indexeddb://veu-' + currentProfile(); }
+  // Estat àudio + model
+  var vCtx = null, vAnalyser = null, vStream = null;
+  var vModel = null, vModelReady = false;
+  var vExamples = {};
+  var vInferTimer = null;
 
-  async function loadTFLibs() {
-    if (window.speechCommands) return true;
-    return new Promise(function(resolve) {
-      var s1 = document.createElement('script');
-      s1.src = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js';
-      s1.onload = function() {
-        var s2 = document.createElement('script');
-        s2.src = 'https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.5.4/dist/speech-commands.min.js';
-        s2.onload = function() { resolve(true); };
-        s2.onerror = function() { resolve(false); };
-        document.head.appendChild(s2);
-      };
-      s1.onerror = function() { resolve(false); };
-      document.head.appendChild(s1);
-    });
-  }
+  function vKey()       { return 'vcal-ex-'  + (currentProfile() || 'def'); }
+  function vModelName() { return 'vcal-m-'   + (currentProfile() || 'def').replace(/[^a-z0-9]/gi, '_'); }
 
-  async function ensureBaseRecognizer() {
-    if (tfBase) return true;
-    try {
-      micStatus.textContent = "⏳ Carregant model (~20 MB)...";
-      tfBase = window.speechCommands.create('BROWSER_FFT');
-      var loadPromise = tfBase.ensureModelLoaded();
-      var timeoutPromise = new Promise(function(_, rej) {
-        setTimeout(function() { rej(new Error('timeout')); }, 25000);
-      });
-      await Promise.race([loadPromise, timeoutPromise]);
+  // ── Àudio ──────────────────────────────────────────────────────────
+  async function vInitAudio() {
+    if (vStream) {
+      if (vCtx && vCtx.state === 'suspended') { try { await vCtx.resume(); } catch(e2) {} }
       return true;
-    } catch(err) {
-      tfBase = null;
-      micStatus.textContent = err.message === 'timeout'
-        ? "⚠️ Model massa lent. Usant reconeixement de veu estàndard..."
-        : "⚠️ Error carregant model. Usant veu estàndard...";
-      console.warn('[TF base]', err);
+    }
+    try {
+      vStream   = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      vCtx      = new (window.AudioContext || window.webkitAudioContext)();
+      var src   = vCtx.createMediaStreamSource(vStream);
+      vAnalyser = vCtx.createAnalyser();
+      vAnalyser.fftSize = VN_FFT;
+      vAnalyser.smoothingTimeConstant = 0.3;
+      src.connect(vAnalyser);
+      return true;
+    } catch(e) {
+      if (e.name === 'NotAllowedError') micStatus.textContent = '⚠️ Cal permís del micròfon';
+      else micStatus.textContent = '⚠️ Error micròfon';
+      console.warn('[vAudio]', e);
       return false;
     }
   }
 
-  async function hasStoredModel() {
-    try {
-      var models = await tf.io.listModels();
-      return voiceModelKey() in models;
-    } catch(err) { return false; }
+  function vGetFFT() {
+    var data = new Uint8Array(VN_BINS);
+    vAnalyser.getByteFrequencyData(data);
+    var f = new Array(VN_BINS);
+    for (var i = 0; i < VN_BINS; i++) f[i] = data[i] / 255.0;
+    return f;
   }
 
-  async function tryLoadModel() {
-    if (!tfBase) return false;
-    try {
-      if (tfXfer) { try { tfXfer.stopListening(); } catch(e2) {} }
-      tfXfer = tfBase.createTransfer('veu-' + currentProfile());
-      await tfXfer.load(voiceModelKey());
-      return true;
-    } catch(err) { tfXfer = null; return false; }
+  function vGetRMS() {
+    var data = new Uint8Array(VN_BINS);
+    vAnalyser.getByteFrequencyData(data);
+    var s = 0;
+    for (var i = 0; i < data.length; i++) s += data[i];
+    return s / data.length / 255.0;
   }
 
-  async function startTFListening() {
-    stopTFListening();
-    if (!tfXfer) return;
-    try {
-      await tfXfer.listen(function(result) {
-        var scores = Array.from(result.scores);
-        var maxScore = Math.max.apply(null, scores);
-        var note = TF_LABELS[scores.indexOf(maxScore)];
-        if (maxScore > TF_THRESH && note !== '_background_noise_') triggerMicNote(note);
-      }, { probabilityThreshold: TF_THRESH, overlapFactor: 0.5 });
-      tfListening = true;
-      micStatus.textContent = "🎤 diga la nota...";
-      micRecalBtn.hidden = false;
-      micBtn.textContent = "🔴 Escoltant...";
-    } catch(err) { console.warn('[TF listen]', err); }
-  }
-
-  function stopTFListening() {
-    if (tfXfer && tfListening) {
-      try { tfXfer.stopListening(); } catch(e2) {}
-      tfListening = false;
+  // Captura 1 segon: 10 frames × 100ms. Retorna el frame de màxim nivell.
+  async function vCapture() {
+    var best = null, bestR = 0;
+    for (var i = 0; i < 10; i++) {
+      await new Promise(function(r) { setTimeout(r, 100); });
+      var r = vGetRMS();
+      if (r > bestR) { bestR = r; best = vGetFFT(); }
     }
+    return best || new Array(VN_BINS).fill(0);
+  }
+
+  // ── TF.js core (carregat lazy, ~300 KB) ───────────────────────────
+  async function vLoadTF() {
+    if (typeof tf !== 'undefined') return true;
+    return new Promise(function(resolve) {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js';
+      s.onload = function() { resolve(true); };
+      s.onerror = function() {
+        var s2 = document.createElement('script');
+        s2.src = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js';
+        s2.onload = function() { resolve(true); };
+        s2.onerror = function() { resolve(false); };
+        document.head.appendChild(s2);
+      };
+      document.head.appendChild(s);
+    });
+  }
+
+  // ── Model TF.js lleuger: 128→64→32→8 ─────────────────────────────
+  function vBuildModel() {
+    var m = tf.sequential({ layers: [
+      tf.layers.dense({ inputShape: [VN_BINS], units: 64, activation: 'relu' }),
+      tf.layers.dropout({ rate: 0.25 }),
+      tf.layers.dense({ units: 32, activation: 'relu' }),
+      tf.layers.dense({ units: VN_LABELS.length, activation: 'softmax' })
+    ]});
+    m.compile({ optimizer: tf.train.adam(0.01), loss: 'categoricalCrossentropy' });
+    return m;
+  }
+
+  async function vTrain(onPct) {
+    // Afegeix silenci sintètic si l'usuari ha saltat el pas _noise_
+    if (!vExamples['_noise_'] || vExamples['_noise_'].length === 0) {
+      vExamples['_noise_'] = [];
+      for (var n = 0; n < VN_EXAMPLES; n++) vExamples['_noise_'].push(new Array(VN_BINS).fill(0));
+    }
+    var xs = [], ys = [];
+    VN_LABELS.forEach(function(lbl, idx) {
+      (vExamples[lbl] || []).forEach(function(fft) {
+        xs.push(fft);
+        var y = new Array(VN_LABELS.length).fill(0); y[idx] = 1; ys.push(y);
+      });
+    });
+    var notesOk = VN_NOTES.every(function(n) { return vExamples[n] && vExamples[n].length > 0; });
+    if (!notesOk || xs.length < VN_LABELS.length) return false;
+    if (vModel) { try { vModel.dispose(); } catch(e2) {} vModel = null; }
+    vModel = vBuildModel();
+    var xT = tf.tensor2d(xs), yT = tf.tensor2d(ys);
+    var EP = 60;
+    await vModel.fit(xT, yT, {
+      epochs: EP, shuffle: true, batchSize: Math.min(xs.length, 8),
+      callbacks: { onEpochEnd: function(ep) { if (onPct) onPct(Math.round((ep + 1) / EP * 100)); } }
+    });
+    xT.dispose(); yT.dispose();
+    vModelReady = true;
+    return true;
+  }
+
+  function vPredict(fft) {
+    if (!vModel || !vModelReady) return null;
+    var scores;
+    tf.tidy(function() {
+      var t = tf.tensor2d([fft]);
+      var p = vModel.predict(t);
+      scores = Array.from(p.dataSync());
+    });
+    var maxS = Math.max.apply(null, scores);
+    return { note: VN_LABELS[scores.indexOf(maxS)], score: maxS };
+  }
+
+  // ── Guardat / càrrega ─────────────────────────────────────────────
+  function vHasData() {
+    try { return !!localStorage.getItem(vKey()); } catch(e) { return false; }
+  }
+
+  function vLoadData() {
+    try {
+      var d = JSON.parse(localStorage.getItem(vKey()));
+      vExamples = (d && d.ex) ? d.ex : {};
+      return VN_NOTES.some(function(n) { return vExamples[n] && vExamples[n].length > 0; });
+    } catch(e) { vExamples = {}; return false; }
+  }
+
+  function vSaveData() {
+    try { localStorage.setItem(vKey(), JSON.stringify({ ex: vExamples, v: 1 })); } catch(e) {}
+  }
+
+  async function vSaveModel() {
+    if (!vModel) return;
+    try { await vModel.save('localstorage://' + vModelName()); } catch(e) {}
+  }
+
+  async function vLoadModel() {
+    try {
+      vModel = await tf.loadLayersModel('localstorage://' + vModelName());
+      vModel.compile({ optimizer: tf.train.adam(0.01), loss: 'categoricalCrossentropy' });
+      vModelReady = true;
+      return true;
+    } catch(e) { vModel = null; vModelReady = false; return false; }
+  }
+
+  // ── Inferència en temps real ──────────────────────────────────────
+  function vStartListen() {
+    vStopListen();
+    micBtn.textContent = "🔴 Escoltant...";
+    micStatus.textContent = "🎤 diga la nota...";
+    if (micRecalBtn) micRecalBtn.hidden = false;
+    vInferTimer = setInterval(function() {
+      if (!micActive || !vModelReady || !vAnalyser) return;
+      if (vGetRMS() < 0.06) return;
+      var res = vPredict(vGetFFT());
+      if (res && res.score > VN_THRESH && res.note !== '_noise_') triggerMicNote(res.note);
+    }, 250);
+  }
+
+  function vStopListen() {
+    if (vInferTimer) { clearInterval(vInferTimer); vInferTimer = null; }
     if (micRecalBtn) micRecalBtn.hidden = true;
   }
 
-  // Calibració — listeners s'afegeixen la 1a vegada que s'obre el modal
-  const TF_CAL_STEPS = [...TF_NOTES, '_background_noise_'];
-  const TF_CAL_NAMES = { do:'DO', re:'RE', mi:'MI', fa:'FA', sol:'SOL', la:'LA', si:'SI', '_background_noise_':'🔇' };
-  const TF_EXAMPLES  = 4;
+  // ── triggerMicNote ────────────────────────────────────────────────
+  function triggerMicNote(noteCa) {
+    var now = performance.now();
+    if (now - micLastMatchAt < 800) return;
+    micLastMatchAt = now;
+    micStatus.textContent = "✓ " + noteCa.toUpperCase();
+    micStatus.classList.add("detected");
+    setTimeout(function() {
+      if (micActive) micStatus.textContent = "🎤 diga la nota...";
+      micStatus.classList.remove("detected");
+    }, 800);
+    var btn = null;
+    if (currentStep < sequence.length) {
+      var cur = sequence[currentStep];
+      if (NOTE_NAMES_CA[noteLetter(cur.note)] === noteCa)
+        btn = trainPiano ? trainPiano.querySelector('[data-pitch="' + cur.note + '"]') : null;
+    }
+    if (!btn && trainPiano)
+      btn = trainPiano.querySelector('.nk-key:not(.nk-inactive)[data-note="' + noteCa + '"]');
+    if (btn) btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+  }
+
+  // ── startMic / stopMic ────────────────────────────────────────────
+  async function startMic() {
+    micActive = true; micLastMatchAt = 0;
+    micBtn.classList.add("active"); micBtn.textContent = "⏳ ...";
+
+    // 1. Àudio primer — usar l'activació d'usuari ara mateix
+    var audioOk = await vInitAudio();
+    if (!audioOk) {
+      micActive = false; micBtn.classList.remove("active"); micBtn.textContent = "🎤 Veu"; return;
+    }
+
+    // 2. Model ja en memòria → escolta directa
+    if (vModelReady) { vStartListen(); return; }
+
+    // 3. Carregar TF.js + intentar carregar model guardat
+    micStatus.textContent = "⏳ Preparant...";
+    var tfOk = await vLoadTF();
+    if (tfOk) {
+      // 3a. Carrega model guardat (instant)
+      var modelOk = await vLoadModel();
+      if (modelOk) { vStartListen(); return; }
+      // 3b. Re-entrena des dels exemples (< 5 seg)
+      if (vHasData() && vLoadData()) {
+        var trainOk = await vTrain(function(pct) { micStatus.textContent = "⏳ " + pct + "%..."; });
+        if (trainOk) { vSaveModel(); vStartListen(); return; }
+      }
+    }
+
+    // 4. Primera vegada o error → calibració
+    micActive = false; micBtn.classList.remove("active"); micBtn.textContent = "🎤 Veu";
+    micStatus.textContent = "";
+    showCal();
+  }
+
+  function stopMic() {
+    micActive = false; micLastMatchAt = 0;
+    vStopListen();
+    micBtn.classList.remove("active"); micBtn.textContent = "🎤 Veu";
+    micStatus.textContent = ""; micStatus.classList.remove("detected");
+  }
+
+  // ── Speech API (fallback si Web Audio no disponible) ──────────────
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let speechRec = null, speechLive = false;
+
+  function matchNoteCA(text) {
+    var t = " " + text.toLowerCase().replace(/[^a-z]/g, " ") + " ";
+    if (t.includes(" sol ")) return "sol";
+    if (t.includes(" si "))  return "si";
+    if (/ do[snhx]? /.test(t)) return "do";
+    if (t.includes(" re "))  return "re";
+    if (t.includes(" mi "))  return "mi";
+    if (t.includes(" fa ") || t.includes(" ja ")) return "fa";
+    if (t.includes(" la "))  return "la";
+    return null;
+  }
+
+  function startSpeechAPI() {
+    if (!SpeechRec) { micStatus.textContent = "⚠️ Usa Chrome o Edge"; stopMic(); return; }
+    if (!speechRec) {
+      speechRec = new SpeechRec();
+      speechRec.lang = "it-IT"; speechRec.continuous = false;
+      speechRec.interimResults = true; speechRec.maxAlternatives = 3;
+      speechRec.onresult = function(e) {
+        for (var i = e.resultIndex; i < e.results.length; i++) {
+          if (!e.results[i].isFinal) {
+            var interim = e.results[i][0] ? e.results[i][0].transcript.toLowerCase().trim() : "";
+            if (interim) micStatus.textContent = "🎤 " + interim;
+            continue;
+          }
+          if (speechLive) try { speechRec.stop(); } catch(ex) {}
+          for (var j = 0; j < e.results[i].length; j++) {
+            var note = matchNoteCA(e.results[i][j].transcript);
+            if (note) { triggerMicNote(note); return; }
+          }
+          var heard = e.results[i][0] ? e.results[i][0].transcript.toLowerCase().trim() : "";
+          if (heard) micStatus.textContent = "? '" + heard + "'";
+        }
+      };
+      speechRec.onerror = function(e) {
+        if (e.error === "no-speech") { micStatus.textContent = "🎤 diga la nota..."; return; }
+        if (e.error === "not-allowed") { micStatus.textContent = "⚠️ Permís denegat"; stopMic(); return; }
+        micStatus.textContent = "⚠️ " + e.error;
+      };
+      speechRec.onend = function() { if (speechLive) try { speechRec.start(); } catch(ex) {} };
+    }
+    speechLive = true;
+    micBtn.textContent = "🔴 Veu activa";
+    micStatus.textContent = "🎤 diga la nota...";
+    try { speechRec.start(); } catch(e) { micStatus.textContent = "⚠️ " + e.message; }
+  }
+
+  function stopSpeechAPI() {
+    speechLive = false;
+    if (speechRec) try { speechRec.stop(); } catch(ex) {}
+  }
+
+  // ── Calibració ────────────────────────────────────────────────────
+  const CAL_STEPS = ['do','re','mi','fa','sol','la','si','_noise_'];
   var calStep = 0, calCounts = {}, calListenersAdded = false;
 
   function showCal() {
@@ -1213,7 +1433,7 @@
       if (recBtn)  recBtn.addEventListener('click', vcalRecord);
       if (skipBtn) skipBtn.addEventListener('click', function() {
         calStep++;
-        if (calStep >= TF_CAL_STEPS.length) vcalTrain();
+        if (calStep >= CAL_STEPS.length) vcalFinish();
         else { renderCalStep(); var rb = document.getElementById('vcal-record-btn'); if (rb) rb.disabled = false; }
       });
       if (canBtn)  canBtn.addEventListener('click', hideCal);
@@ -1223,22 +1443,22 @@
   function hideCal() { if (vcalOverlay) vcalOverlay.hidden = true; }
 
   function renderCalStep() {
-    var label   = TF_CAL_STEPS[calStep];
-    var isNoise = label === '_background_noise_';
+    var label   = CAL_STEPS[calStep];
+    var isNoise = label === '_noise_';
     var done    = calCounts[label] || 0;
-    var sc = document.getElementById('vcal-step-counter');
-    var nb = document.getElementById('vcal-note-big');
-    var ins= document.getElementById('vcal-instruction');
-    var dots=document.getElementById('vcal-dots');
-    var btn = document.getElementById('vcal-record-btn');
-    if (sc)  sc.textContent  = 'Pas ' + (calStep + 1) + ' / ' + TF_CAL_STEPS.length;
-    if (nb)  nb.textContent  = TF_CAL_NAMES[label];
+    var sc   = document.getElementById('vcal-step-counter');
+    var nb   = document.getElementById('vcal-note-big');
+    var ins  = document.getElementById('vcal-instruction');
+    var dots = document.getElementById('vcal-dots');
+    var btn  = document.getElementById('vcal-record-btn');
+    if (sc)  sc.textContent  = 'Pas ' + (calStep + 1) + ' / ' + CAL_STEPS.length;
+    if (nb)  nb.textContent  = VN_NAMES[label];
     if (ins) ins.textContent = isNoise
-      ? 'Queda\'t en silenci ' + TF_EXAMPLES + ' vegades'
-      : 'Di "' + label.toUpperCase() + '" ' + TF_EXAMPLES + ' vegades';
+      ? 'Queda\'t en silenci ' + VN_EXAMPLES + ' vegades'
+      : 'Di "' + label.toUpperCase() + '" ' + VN_EXAMPLES + ' vegades';
     if (dots) {
       dots.innerHTML = '';
-      for (var i = 0; i < TF_EXAMPLES; i++) {
+      for (var i = 0; i < VN_EXAMPLES; i++) {
         var d = document.createElement('span');
         d.className = 'vcal-dot' + (i < done ? ' filled' : '');
         dots.appendChild(d);
@@ -1246,45 +1466,34 @@
     }
     if (btn) {
       btn.textContent = isNoise ? '🔇 Grava silenci' : '🎤 Grava';
-      btn.disabled    = done >= TF_EXAMPLES;
+      btn.disabled    = done >= VN_EXAMPLES;
       btn.classList.remove('recording');
     }
   }
 
   async function vcalRecord() {
-    var label = TF_CAL_STEPS[calStep];
+    var label = CAL_STEPS[calStep];
     var btn   = document.getElementById('vcal-record-btn');
-    if (!btn) return;
-    btn.disabled = true;
-    btn.textContent = 'PARLA! 🔴';
-    btn.classList.add('recording');
-    if (!tfXfer) tfXfer = tfBase.createTransfer('veu-' + currentProfile());
-    await new Promise(function(r) { setTimeout(r, 350); });
-    try {
-      await tfXfer.collectExample(label);
-      calCounts[label] = (calCounts[label] || 0) + 1;
-      renderCalStep();
-      if (calCounts[label] >= TF_EXAMPLES) setTimeout(vcalAdvance, 700);
-      else btn.disabled = false;
-    } catch(err) {
-      btn.classList.remove('recording');
-      btn.textContent = '⚠️ Reintenta';
-      btn.disabled = false;
-      console.warn('[TF collect]', err);
-    }
+    if (!btn || !vAnalyser) return;
+    if (vCtx && vCtx.state === 'suspended') { try { await vCtx.resume(); } catch(e2) {} }
+    btn.disabled = true; btn.textContent = 'PARLA! 🔴'; btn.classList.add('recording');
+    await new Promise(function(r) { setTimeout(r, 300); });
+    var sample = await vCapture();
+    if (!vExamples[label]) vExamples[label] = [];
+    vExamples[label].push(sample);
+    calCounts[label] = (calCounts[label] || 0) + 1;
+    renderCalStep();
+    if (calCounts[label] >= VN_EXAMPLES) setTimeout(vcalAdvance, 600);
+    else btn.disabled = false;
   }
 
   function vcalAdvance() {
     calStep++;
-    if (calStep >= TF_CAL_STEPS.length) vcalTrain();
-    else {
-      renderCalStep();
-      var rb = document.getElementById('vcal-record-btn');
-      if (rb) rb.disabled = false;
-    }
+    if (calStep >= CAL_STEPS.length) vcalFinish();
+    else { renderCalStep(); var rb = document.getElementById('vcal-record-btn'); if (rb) rb.disabled = false; }
   }
 
-  async function vcalTrain() {
+  async function vcalFinish() {
     var recArea  = document.getElementById('vcal-record-area');
     var trainArea= document.getElementById('vcal-training-area');
     var cancelBtn= document.getElementById('vcal-cancel-btn');
@@ -1293,147 +1502,55 @@
     if (recArea)   recArea.hidden   = true;
     if (trainArea) trainArea.hidden = false;
     if (cancelBtn) cancelBtn.hidden = true;
-    var EPOCHS = 30;
+    if (txt) txt.textContent = 'Carregant TF.js (~300 KB)...';
+    if (bar) bar.style.width = '5%';
+
+    var tfOk = await vLoadTF();
+    if (!tfOk) {
+      if (txt) txt.textContent = '⚠️ Error carregant TF.js. Cal internet la 1a vegada.';
+      if (cancelBtn) cancelBtn.hidden = false;
+      return;
+    }
+    if (bar) bar.style.width = '10%';
+    if (txt) txt.textContent = 'Entrenant el model amb la teva veu...';
+
     try {
-      await tfXfer.train({
-        epochs: EPOCHS,
-        callback: { onEpochEnd: function(ep) {
-          var pct = Math.round((ep + 1) / EPOCHS * 100);
-          if (bar) bar.style.width = pct + '%';
-          if (txt) txt.textContent = 'Entrenant... ' + pct + '%';
-        }}
+      var ok = await vTrain(function(pct) {
+        if (bar) bar.style.width = (10 + pct * 0.9) + '%';
+        if (txt) txt.textContent = 'Entrenant... ' + pct + '%';
       });
-      await tfXfer.save(voiceModelKey());
-      if (txt) txt.textContent = 'Llest! Veu guardada.';
+      if (!ok) {
+        if (txt) txt.textContent = '⚠️ Falten notes. Reinicia la calibració.';
+        if (cancelBtn) cancelBtn.hidden = false;
+        return;
+      }
+      vSaveData();
+      vSaveModel();
       if (bar) bar.style.width = '100%';
-      setTimeout(async function() {
+      if (txt) txt.textContent = '✅ Llest! La teva veu ha quedat guardada.';
+      setTimeout(function() {
         hideCal();
-        stopSpeechAPI();
         micActive = true;
         micBtn.classList.add("active");
-        await startTFListening();
+        vStartListen();
       }, 1800);
     } catch(err) {
-      if (txt) txt.textContent = 'Error: ' + err.message;
+      if (txt) txt.textContent = '⚠️ Error: ' + err.message;
       if (cancelBtn) cancelBtn.hidden = false;
-      console.error('[TF train]', err);
+      console.error('[vcalFinish]', err);
     }
   }
 
-  async function startMic() {
-    micActive = true;
-    micLastMatchAt = 0;
-    // Arranca Speech API immediatament — funciona sempre sense esperes
-    startSpeechAPI();
-    // Si ja tenim model TF.js carregat en memòria, el canviem
-    if (tfXfer) {
-      stopSpeechAPI();
-      await startTFListening();
-    }
-  }
-
-  function stopMic() {
-    micActive = false; micLastMatchAt = 0;
-    stopTFListening(); stopSpeechAPI();
-    micBtn.classList.remove("active"); micBtn.textContent = "🎤 Veu";
-    micStatus.textContent = ""; micStatus.classList.remove("detected");
-  }
-
-  // Speech API (fallback)
-  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let speechRec  = null;
-  let speechLive = false;
-
-  function matchNoteCA(text) {
-    const t = " " + text.toLowerCase().replace(/[^a-z]/g, " ") + " ";
-    if (t.includes(" sol ")) return "sol";
-    if (t.includes(" si "))  return "si";
-    // "do" sovint transcrit com "dos"/"don"/"doh" per la Speech API en espanyol
-    if (/ do[snhx]? /.test(t)) return "do";
-    if (t.includes(" re "))  return "re";
-    if (t.includes(" mi "))  return "mi";
-    // "fa" a vegades transcrit com "ja"/"ha" — afegim alternatives catalanes
-    if (t.includes(" fa ") || t.includes(" ja ")) return "fa";
-    if (t.includes(" la "))  return "la";
-    return null;
-  }
-
-  function triggerMicNote(noteCa) {
-    const now = performance.now();
-    if (now - micLastMatchAt < 800) return;
-    micLastMatchAt = now;
-    micStatus.textContent = "✓ " + noteCa.toUpperCase();
-    micStatus.classList.add("detected");
-    setTimeout(() => {
-      if (micActive) { micStatus.textContent = "🎤 diga la nota..."; }
-      micStatus.classList.remove("detected");
-    }, 800);
-    let btn = null;
-    if (currentStep < sequence.length) {
-      const cur = sequence[currentStep];
-      if (NOTE_NAMES_CA[noteLetter(cur.note)] === noteCa)
-        btn = trainPiano ? trainPiano.querySelector('[data-pitch="' + cur.note + '"]') : null;
-    }
-    if (!btn && trainPiano)
-      btn = trainPiano.querySelector('.nk-key:not(.nk-inactive)[data-note="' + noteCa + '"]');
-    if (btn) btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-  }
-
-  function startSpeechAPI() {
-    if (!SpeechRec) {
-      micStatus.textContent = "⚠️ Usa Chrome o Edge";
-      micActive = false; micBtn.classList.remove("active"); micBtn.textContent = "🎤 Veu"; return;
-    }
-    if (!speechRec) {
-      speechRec = new SpeechRec();
-      speechRec.lang = "it-IT";
-      speechRec.continuous = false;
-      speechRec.interimResults = true;
-      speechRec.maxAlternatives = 3;
-      speechRec.onresult = function(e) {
-        for (var i = e.resultIndex; i < e.results.length; i++) {
-          if (!e.results[i].isFinal) {
-            var interim = e.results[i][0] ? e.results[i][0].transcript.toLowerCase().trim() : "";
-            if (interim) micStatus.textContent = "🎤 " + interim;
-            continue;
-          }
-          if (speechLive) try { speechRec.stop(); } catch(ex) {}
-          for (var j = 0; j < e.results[i].length; j++) {
-            var note = matchNoteCA(e.results[i][j].transcript);
-            if (note) { triggerMicNote(note); return; }
-          }
-          var heard = e.results[i][0] ? e.results[i][0].transcript.toLowerCase().trim() : "";
-          if (heard) micStatus.textContent = "? '" + heard + "'";
-        }
-      };
-      speechRec.onerror = function(e) {
-        if (e.error === "no-speech") { micStatus.textContent = "🎤 diga la nota..."; return; }
-        if (e.error === "not-allowed") { micStatus.textContent = "⚠️ Permís micròfon denegat"; stopMic(); return; }
-        micStatus.textContent = "⚠️ " + e.error;
-      };
-      speechRec.onend = function() { if (speechLive) try { speechRec.start(); } catch(ex) {} };
-    }
-    speechLive = true;
-    micBtn.textContent = "🔴 Veu activa";
-    micStatus.textContent = "🎤 diga la nota...";
-    try { speechRec.start(); } catch(e) { micStatus.textContent = "⚠️ " + e.message; }
-  }
-
-  function stopSpeechAPI() {
-    speechLive = false;
-    if (speechRec) try { speechRec.stop(); } catch(ex) {}
-  }
-
+  // ── Listeners ─────────────────────────────────────────────────────
   micBtn.addEventListener("click", function() {
     if (micActive) stopMic(); else startMic();
   });
 
   if (micRecalBtn) {
-    micRecalBtn.addEventListener("click", async function() {
+    micRecalBtn.addEventListener("click", function() {
       stopMic();
-      var tfOk = await loadTFLibs();
-      if (tfOk) await ensureBaseRecognizer();
-      showCal();
+      if (vAnalyser) showCal();
+      else vInitAudio().then(function(ok) { if (ok) showCal(); });
     });
   }
 

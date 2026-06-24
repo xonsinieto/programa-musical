@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v88-speech-first";
+const CACHE = "lectura-notes-v89-custom-voice";
 const FILES = [
   "./",
   "./index.html",
@@ -32,8 +32,25 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
-  // Xarxa-primer amb `cache: "no-cache"` ? sempre revalida amb servidor.
-  // Nom�s cau al cach� si la xarxa falla (offline).
+
+  // TF.js CDN: cache-first (URLs versionades, mai canvien)
+  if (req.url.includes("cdn.jsdelivr.net/npm/@tensorflow")) {
+    event.respondWith(
+      caches.match(req).then((cached) => {
+        if (cached) return cached;
+        return fetch(req).then((res) => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => null);
+          }
+          return res;
+        });
+      })
+    );
+    return;
+  }
+
+  // Resta: xarxa-primer, cau al cache si la xarxa falla (offline)
   event.respondWith(
     fetch(req, { cache: "no-cache" })
       .then((res) => {
