@@ -1149,7 +1149,7 @@
     // El model de veu italià coneix PERFECTAMENT totes les síl·labes,
     // incloent "do" que en espanyol/català no és paraula comuna.
     speechRec.lang = "it-IT";
-    speechRec.continuous = false;   // single-shot: millor per paraules soltes
+    speechRec.continuous = true;    // continu: sense parons entre notes
     speechRec.interimResults = true;
     speechRec.maxAlternatives = 3;
     speechRec.onresult = (e) => {

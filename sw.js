@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v78-italian-singleshot";
+const CACHE = "lectura-notes-v79-italian-continuous";
 const FILES = [
   "./",
   "./index.html",
