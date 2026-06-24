@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v87-mobile-speech";
+const CACHE = "lectura-notes-v88-speech-first";
 const FILES = [
   "./",
   "./index.html",

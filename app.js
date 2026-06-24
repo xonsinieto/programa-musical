@@ -1308,7 +1308,9 @@
       if (bar) bar.style.width = '100%';
       setTimeout(async function() {
         hideCal();
+        stopSpeechAPI();
         micActive = true;
+        micBtn.classList.add("active");
         await startTFListening();
       }, 1800);
     } catch(err) {
@@ -1318,34 +1320,16 @@
     }
   }
 
-  function isMobileDevice() {
-    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  }
-
   async function startMic() {
     micActive = true;
     micLastMatchAt = 0;
-    // Mòbil: Speech API directament (model TF.js massa gran per connexió mòbil)
-    if (isMobileDevice()) {
-      startSpeechAPI();
-      return;
-    }
-    // Ordinador: TF.js (connexió ràpida, model es descarrega de pressa)
-    micBtn.classList.add("active");
-    micBtn.textContent = "⏳ Carregant...";
-    micStatus.textContent = "";
-    var tfOk = await loadTFLibs();
-    if (tfOk && await ensureBaseRecognizer()) {
-      if (await hasStoredModel() && await tryLoadModel()) {
-        await startTFListening();
-      } else {
-        micBtn.textContent = "🎤 Veu";
-        micBtn.classList.remove("active");
-        showCal();
-      }
-      return;
-    }
+    // Arranca Speech API immediatament — funciona sempre sense esperes
     startSpeechAPI();
+    // Si ja tenim model TF.js carregat en memòria, el canviem
+    if (tfXfer) {
+      stopSpeechAPI();
+      await startTFListening();
+    }
   }
 
   function stopMic() {
@@ -1445,8 +1429,10 @@
   });
 
   if (micRecalBtn) {
-    micRecalBtn.addEventListener("click", function() {
+    micRecalBtn.addEventListener("click", async function() {
       stopMic();
+      var tfOk = await loadTFLibs();
+      if (tfOk) await ensureBaseRecognizer();
       showCal();
     });
   }
