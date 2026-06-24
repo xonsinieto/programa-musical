@@ -1145,35 +1145,42 @@
   function initSpeech() {
     if (!SpeechRec) return;
     speechRec = new SpeechRec();
-    speechRec.lang = "ca-ES";    // Català: "fa", "sol", "la", "si" són paraules molt comunes
-    speechRec.continuous = true;
+    // it-IT: l'italià és l'origen del solfège (do/re/mi/fa/sol/la/si).
+    // El model de veu italià coneix PERFECTAMENT totes les síl·labes,
+    // incloent "do" que en espanyol/català no és paraula comuna.
+    speechRec.lang = "it-IT";
+    speechRec.continuous = false;   // single-shot: millor per paraules soltes
     speechRec.interimResults = true;
     speechRec.maxAlternatives = 3;
     speechRec.onresult = (e) => {
       for (let i = e.resultIndex; i < e.results.length; i++) {
         if (!e.results[i].isFinal) {
-          // Interim: mostrar però NO disparar (poden ser incorrectes)
           const interim = e.results[i][0] ? e.results[i][0].transcript.toLowerCase().trim() : "";
           if (interim) micStatus.textContent = "🎤 " + interim;
           continue;
         }
-        // Final: ara sí, comprovem totes les alternatives
+        // Final: comprova totes les alternatives
         for (let j = 0; j < e.results[i].length; j++) {
           const note = matchNoteCA(e.results[i][j].transcript);
           if (note) { triggerMicNote(note); return; }
         }
+        // Res reconegut: mostra el que ha sentit (ajuda a diagnosticar)
+        const heard = e.results[i][0] ? e.results[i][0].transcript.toLowerCase().trim() : "";
+        if (heard) micStatus.textContent = "? '" + heard + "'";
       }
     };
     speechRec.onerror = (e) => {
-      if (e.error === "no-speech") return;
+      if (e.error === "no-speech") {
+        micStatus.textContent = "🎤 diga la nota...";
+        return;
+      }
       if (e.error === "network") {
         micStatus.textContent = "⚠️ Cal connexió internet";
       } else if (e.error === "not-allowed") {
         micStatus.textContent = "⚠️ Permís micròfon denegat";
-        stopMic();
+        stopMic(); return;
       } else {
         micStatus.textContent = "⚠️ " + e.error;
-        console.warn("[SPEECH]", e.error);
       }
     };
     speechRec.onend = () => {
