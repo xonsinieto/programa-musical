@@ -1318,15 +1318,25 @@
     }
   }
 
+  function isMobileDevice() {
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  }
+
   async function startMic() {
+    micActive = true;
+    micLastMatchAt = 0;
+    // Mòbil: Speech API directament (model TF.js massa gran per connexió mòbil)
+    if (isMobileDevice()) {
+      startSpeechAPI();
+      return;
+    }
+    // Ordinador: TF.js (connexió ràpida, model es descarrega de pressa)
     micBtn.classList.add("active");
     micBtn.textContent = "⏳ Carregant...";
     micStatus.textContent = "";
-    micLastMatchAt = 0;
     var tfOk = await loadTFLibs();
     if (tfOk && await ensureBaseRecognizer()) {
       if (await hasStoredModel() && await tryLoadModel()) {
-        micActive = true;
         await startTFListening();
       } else {
         micBtn.textContent = "🎤 Veu";
@@ -1335,7 +1345,6 @@
       }
       return;
     }
-    micActive = true;
     startSpeechAPI();
   }
 

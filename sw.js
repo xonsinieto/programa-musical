@@ -1,4 +1,4 @@
-const CACHE = "lectura-notes-v86-timeout";
+const CACHE = "lectura-notes-v87-mobile-speech";
 const FILES = [
   "./",
   "./index.html",
